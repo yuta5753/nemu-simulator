@@ -1,0 +1,22 @@
+@media print {
+  @page { size: A4 portrait; margin: 14mm; }
+  .site-head, #stepper, #floatp, .no-print, .footnote, details.guide { display: none !important; }
+  .step-panel { display: none !important; }
+  #panel-4 { display: block !important; }
+  body { background: #fff; padding: 0; color: #1a2236; }
+  .wrap { max-width: none; padding: 0; }
+  .report .rpage { page-break-after: always; break-after: page; border: none; border-radius: 0; padding: 0; margin: 0; box-shadow: none; }
+  .report .rpage:last-child { page-break-after: auto; break-after: auto; }
+  .report .cover { padding: 120px 0; }
+  .card, .kpi, .lev { box-shadow: none; }
+  .kpi.accent, .impact { background: #eef1f6 !important; color: #1a2236 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .kpi.accent .kval, .kpi.accent .klab, .kpi.accent .ksub, .kpi.accent .kval .yen, .impact .il, .impact .iv, .impact .iv .delta { color: #1a2236 !important; }
+  .kpis { grid-template-columns: repeat(4, 1fr); }
+  .lev-grid { grid-template-columns: 1fr 1fr; }
+  .quad { max-width: 150mm; }
+  .ltable { font-size: 11px; }
+  .tag { border: 1px solid #1a2236; color: #1a2236 !important; background: #fff !important; }
+  .qdot { fill-opacity: .5; }
+  .report .ltable, .report .lev, .report .kpi, .report .impact, .report .tm-row { break-inside: avoid; page-break-inside: avoid; }
+  .report .rpage h3 { break-after: avoid; page-break-after: avoid; }
+}
