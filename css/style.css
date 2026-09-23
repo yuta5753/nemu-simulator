@@ -64,6 +64,7 @@ button,input,select,textarea{font-family:inherit}
 .inp,textarea{width:100%;font-size:15px;font-weight:700;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff}
 textarea{font-weight:500;font-size:13px;resize:vertical}
 .inp:focus,textarea:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(184,146,74,.15)}
+.inp:invalid,.yrtable input:invalid,.gbox input:invalid,.ltable td input:invalid{border-color:var(--bad);box-shadow:0 0 0 3px rgba(192,90,74,.12)}
 .subttl{font-size:12px;font-weight:800;color:var(--ink-soft);margin:6px 0 6px;display:flex;align-items:center;gap:6px}
 .subttl::before{content:"＞";color:var(--gold);font-weight:800}
 .yrtable{width:100%;border-collapse:collapse;margin-bottom:8px}

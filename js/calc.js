@@ -7,12 +7,12 @@ window.Sim = window.Sim || {};
   function applied(cat, period, levers) {
     const l = Object.assign(L0(), levers || {}); const later = cat.later[period - 1] || { rate: 0, aov: 0 };
     return {
-      newN: cat.newCustomers * (1 + l.newPct / 100),
-      entryPrice: cat.entryPrice * (1 + l.entryPricePct / 100),
+      newN: Math.max(0, cat.newCustomers) * (1 + l.newPct / 100),
+      entryPrice: Math.max(0, cat.entryPrice) * (1 + l.entryPricePct / 100),
       sameRate: clamp(cat.sameDay.rate + l.sameDayPt, 0, 100) / 100,
-      sameAov: cat.sameDay.aov * (1 + l.aovPct / 100),
+      sameAov: Math.max(0, cat.sameDay.aov) * (1 + l.aovPct / 100),
       laterRate: clamp(later.rate + l.laterPt, 0, 100) / 100,
-      laterAov: later.aov * (1 + l.aovPct / 100)
+      laterAov: Math.max(0, later.aov) * (1 + l.aovPct / 100)
     };
   }
   function ltv(cat, period, levers) {

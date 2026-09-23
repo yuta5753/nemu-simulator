@@ -8,7 +8,7 @@ window.Sim = window.Sim || {};
   const api = { update, setStep, getState: () => app.state, get period() { return app.state.store.period; } };
   function persist() { if (app.storage) Sim.state.save(app.state, app.storage); }
   function applyGuide(el) { if (document.body.classList.contains('guide-open')) el.querySelectorAll('details.guide').forEach(d => { d.open = true; }); }
-  function update(fn, opts) { opts = opts || {}; fn(app.state); Sim.state.syncScenarios(app.state); persist(); reportDirty = true; if (opts.structural) renderStep(); else refreshStep(); }
+  function update(fn, opts) { opts = opts || {}; fn(app.state); Sim.state.syncScenarios(app.state); app.state.meta.updatedAt = new Date().toISOString(); persist(); reportDirty = true; if (opts.structural) renderStep(); else refreshStep(); }
   function renderHeader() {
     const s = app.state.store; $('head-title').textContent = (s.name ? s.name + '｜' : '') + '売上シミュレーター';
     document.title = (s.name ? s.name + '｜' : '') + '店舗 売上シミュレーター';

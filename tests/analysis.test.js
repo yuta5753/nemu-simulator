@@ -50,6 +50,12 @@ test('checks: 累計の順序と母数不足', () => {
   const s = sample(); s.categories[0].later[1].rate = 30; s.categories[1].newCustomers = 5; const w = A.checks(s);
   eq(w.map(x => x.code), ['later_rate_order', 'small_base']);
 });
+test('checks: 範囲外の入力に out_of_range が出て、計算は上限・下限で丸められる', () => {
+  const s = sample(); s.categories[0].later[2].rate = 150; s.categories[1].entryPrice = -5000;
+  const oor = A.checks(s).filter(x => x.code === 'out_of_range');
+  eq(oor.length, 2); ok(oor.some(x => x.categoryId === s.categories[0].id)); ok(oor.some(x => x.categoryId === s.categories[1].id));
+  eq(Sim.calc.store(s, 3).categories[1].entryPrice, 0);
+});
 test('comments: 文章が出る・カテゴリ名を含む・空なら案内文', () => {
   const cm = A.comments(sample(), 3); ok(cm.length >= 4); ok(cm.some(c => c.includes('枕（フィッティング）') && c.includes('主力')));
   ok(cm.some(c => c.includes('目安値か前期')));

@@ -102,7 +102,10 @@ Sim.ui = Sim.ui || {};
       'add-channel': () => api.update(s => { s.channels.push(Sim.state.newChannel()); }, { structural: true }),
       'del-channel': d => api.update(s => { s.channels.splice(+d.index, 1); }, { structural: true }),
       'paste-preview': () => { const text = el.querySelector('#paste-text').value; const res = Sim.paste.parse(text, { period: api.period }); pendingRows = res.rows; renderPreview(res, api, el); },
-      'paste-apply': () => { if (!pendingRows || !pendingRows.length) return; const rows = pendingRows; pendingRows = null; api.update(s => { const r = Sim.paste.apply(s, rows); Object.assign(s, r.state); }, { structural: true }); }
+      'paste-apply': () => { if (!pendingRows || !pendingRows.length) return; const rows = pendingRows; pendingRows = null; let summary = [];
+        api.update(s => { const r = Sim.paste.apply(s, rows); Object.assign(s, r.state); summary = r.summary; }, { structural: true });
+        const u = summary.filter(x => x.action === 'update').length; const a = summary.filter(x => x.action === 'add').length;
+        alert(`取り込みました（上書き${u}件・追加${a}件）`); }
     };
   }
   function outputs(el, state) {

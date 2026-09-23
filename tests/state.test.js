@@ -57,3 +57,19 @@ test('normalize: シナリオの打ち手はlibIdを保持する', () => {
   const s = S.normalize({version:2, categories:[{id:'c1', name:'X'}], plan:{scenarios:[{name:'S', tactics:[{lever:'later', libId:'later-0', text:'x', fromLibrary:true}]}]}});
   eq(s.plan.scenarios[0].tactics[0].libId, 'later-0');
 });
+test('normalize: 不正なidは無害化される', () => {
+  const s = S.normalize({version:2, categories:[{id:'" onfocus=alert(1) x="', name:'A'}], channels:[{id:'a b'}]});
+  ok(/^[A-Za-z0-9_-]+$/.test(s.categories[0].id), 'カテゴリidが無害化されている'); eq(s.channels[0].id, 'ab');
+});
+test('normalize: id重複は別idに振り直され、両方がレバーに残る', () => {
+  const s = S.normalize({version:2, categories:[{id:'c1', name:'A'}, {id:'c1', name:'B'}]});
+  ok(s.categories[0].id !== s.categories[1].id, '重複idは別idになる');
+  ok(s.plan.scenarios[0].levers[s.categories[0].id], '1件目のレバーがある');
+  ok(s.plan.scenarios[0].levers[s.categories[1].id], '2件目のレバーがある');
+});
+test('normalize: activeScenarioは四捨五入して範囲内に丸める', () => {
+  const s1 = S.normalize({version:2, plan:{activeScenario:0.5, scenarios:[{name:'a'},{name:'b'}]}});
+  eq(s1.plan.activeScenario, 1);
+  const s2 = S.normalize({version:2, plan:{activeScenario:7, scenarios:[{name:'a'},{name:'b'}]}});
+  eq(s2.plan.activeScenario, 1);
+});

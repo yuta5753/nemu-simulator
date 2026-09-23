@@ -47,9 +47,7 @@ Sim.ui = Sim.ui || {};
         <button type="button" class="sbtn" data-action="tac-add" data-lever="${k}">＋ 自由記述を追加</button></div>`).join('')}</div>
       <h3 class="h3">選んだ打ち手</h3>
       ${sc.tactics.length ? `<table class="ltable"><tr><th>レバー</th><th>打ち手</th><th>担当</th><th>期限</th><th></th></tr>
-        ${sc.tactics.map((t, i) => { const idx = t.libId ? +t.libId.split('-').pop() : null; const libEntry = t.libId && lib[t.lever] && lib[t.lever][idx];
-          const textCell = libEntry ? esc(Sim.tactics.resolve(libEntry, state)) : `<input type="text" data-path="plan.scenarios.${si}.tactics.${i}.text" value="${esc(t.text)}" placeholder="打ち手を書く">`;
-          return `<tr><td>${leverLabel(t.lever)}</td><td>${textCell}</td><td><input type="text" data-path="plan.scenarios.${si}.tactics.${i}.owner" value="${esc(t.owner)}" placeholder="担当"></td><td><input type="text" data-path="plan.scenarios.${si}.tactics.${i}.due" value="${esc(t.due)}" placeholder="例 11月末"></td><td><button type="button" class="del dark" data-action="tac-del" data-index="${i}">✕</button></td></tr>`; }).join('')}</table>` : '<p class="note-p">まだ打ち手がありません。上の定型から選ぶか、自由記述を追加してください。</p>'}
+        ${sc.tactics.map((t, i) => `<tr><td>${leverLabel(t.lever)}</td><td><input type="text" data-path="plan.scenarios.${si}.tactics.${i}.text" data-demote="${i}" value="${esc(t.text)}" placeholder="打ち手を書く"></td><td><input type="text" data-path="plan.scenarios.${si}.tactics.${i}.owner" value="${esc(t.owner)}" placeholder="担当"></td><td><input type="text" data-path="plan.scenarios.${si}.tactics.${i}.due" value="${esc(t.due)}" placeholder="例 11月末"></td><td><button type="button" class="del dark" data-action="tac-del" data-index="${i}">✕</button></td></tr>`).join('')}</table>` : '<p class="note-p">まだ打ち手がありません。上の定型から選ぶか、自由記述を追加してください。</p>'}
       <label class="flabel">メモ<textarea data-path="plan.scenarios.${si}.memo" rows="3">${esc(sc.memo)}</textarea></label>`;
   }
   function comparison(state, period) {
@@ -66,7 +64,9 @@ Sim.ui = Sim.ui || {};
       <p class="note-p">追加購入率＝1−(1−同日率)(1−後日率)、追加購入単価＝期待追加額÷追加購入率（同日と後日が独立に起きる仮定で束ねた値です）。</p></div></details>`;
   }
   function render(el, state, api) {
-    const { val, esc, guide } = U(); const period = state.store.period; const plan = state.plan; const si = plan.activeScenario; const sc = plan.scenarios[si];
+    const { val, esc, guide } = U(); const period = state.store.period; const plan = state.plan;
+    const si = plan.scenarios[plan.activeScenario] ? plan.activeScenario : 0; const sc = plan.scenarios[si] || plan.scenarios[0];
+    sc.tactics.forEach(t => { if (t.libId) { const idx = +t.libId.split('-').pop(); const entry = Sim.tactics.LIBRARY[t.lever] && Sim.tactics.LIBRARY[t.lever][idx]; if (entry) t.text = Sim.tactics.resolve(entry, state); } });
     el.innerHTML = `
       <div class="sec-title"><span class="no">1</span><h2>目標設定と逆算（${period}年で見た場合）</h2><span class="hint">${guide('期間累計の目標売上を入れると、現状とのギャップと「レバー1本だけで埋める場合の必要量」が出ます。実際は複数のレバーを組み合わせるので、下のシナリオで配分します。')}</span></div>
       <div class="card globals">
@@ -85,9 +85,14 @@ Sim.ui = Sim.ui || {};
       <div class="sec-title"><span class="no">4</span><h2>シナリオ比較</h2></div><div class="card pad" data-out="compare"></div>
       ${crmBlock(state, period, sc)}`;
     outputs(el, state); U().bindPanel(el, api, actions(api, el));
+    if (!el.dataset.demoteBound) {
+      el.dataset.demoteBound = '1';
+      el.addEventListener('input', e => { const t = e.target.closest('[data-demote]'); if (!t) return; api.update(s => { const tc = s.plan.scenarios[si].tactics[+t.dataset.demote]; if (tc && tc.libId) { tc.libId = null; tc.fromLibrary = false; } }); }, { once: false });
+    }
   }
   function outputs(el, state) {
-    const { yen, fmt1, signed, esc } = U(); const period = state.store.period; const plan = state.plan; const sc = plan.scenarios[plan.activeScenario];
+    const { yen, fmt1, signed, esc } = U(); const period = state.store.period; const plan = state.plan;
+    const si = plan.scenarios[plan.activeScenario] ? plan.activeScenario : 0; const sc = plan.scenarios[si] || plan.scenarios[0];
     const target = plan.targetRevenue[period - 1]; const base = Sim.calc.store(state, period); const now = Sim.calc.store(state, period, sc.levers);
     const set = (k, html) => { const n = el.querySelector(`[data-out="${k}"]`); if (n) n.innerHTML = html; };
     plan.scenarios.forEach((s2, i) => set('sc-tabname-' + i, esc(s2.name)));
@@ -107,9 +112,11 @@ Sim.ui = Sim.ui || {};
     return {
       'sc-select': d => api.update(s => { s.plan.activeScenario = +d.index; }, { structural: true }),
       'sc-add': () => api.update(s => { if (s.plan.scenarios.length >= 3) return; s.plan.scenarios.push(Sim.state.newScenario('シナリオ' + (s.plan.scenarios.length + 1), s.categories)); s.plan.activeScenario = s.plan.scenarios.length - 1; }, { structural: true }),
-      'sc-copy': () => api.update(s => { if (s.plan.scenarios.length >= 3) return; const src = s.plan.scenarios[s.plan.activeScenario]; s.plan.scenarios.push(JSON.parse(JSON.stringify(Object.assign({}, src, { name: src.name + 'のコピー' })))); s.plan.activeScenario = s.plan.scenarios.length - 1; }, { structural: true }),
+      'sc-copy': () => { if (api.getState().plan.scenarios.length >= 3) { alert('シナリオは3本までです。'); return; }
+        api.update(s => { const src = s.plan.scenarios[s.plan.activeScenario]; s.plan.scenarios.push(JSON.parse(JSON.stringify(Object.assign({}, src, { name: src.name + 'のコピー' })))); s.plan.activeScenario = s.plan.scenarios.length - 1; }, { structural: true }); },
       'sc-del': () => { if (!confirm('このシナリオを削除しますか？')) return; api.update(s => { if (s.plan.scenarios.length <= 1) return; s.plan.scenarios.splice(s.plan.activeScenario, 1); s.plan.activeScenario = Math.max(0, s.plan.activeScenario - 1); }, { structural: true }); },
       'sc-even': () => {
+        const p0 = api.getState().store.period; if (!(api.getState().plan.targetRevenue[p0 - 1] > 0)) { alert('先に目標売上を入力してください。'); return; }
         const q = (v, L) => Math.max(L.min, Math.min(L.max, Math.round(v / L.step) * L.step));
         let clamped = false;
         api.update(s => { const p = s.store.period; const lv = Sim.calc.evenSplit(s, p, s.plan.targetRevenue[p - 1]); const sc = s.plan.scenarios[s.plan.activeScenario];

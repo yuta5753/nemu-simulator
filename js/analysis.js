@@ -79,7 +79,7 @@ window.Sim = window.Sim || {};
   function timing(state, period) {
     const limit = 365 * period;
     return state.categories.filter(c => c.daysToAddon != null).map(c => {
-      const d = c.daysToAddon; const later = c.later[period - 1] || { rate: 0 };
+      const d = Math.max(0, c.daysToAddon); const later = c.later[period - 1] || { rate: 0 };
       return { id: c.id, name: c.name, days: d,
         touchpoints: [{ label: '同日（接客中）', day: 0 }, { label: '中間フォロー', day: Math.round(d / 2) }, { label: '追加購入の目安', day: Math.round(d) }],
         warning: (d > limit && later.rate > 0) ? `${c.name}：平均日数（${d}日）が選択期間（${limit}日）を超えていますが後日追加率が${later.rate}%です。日数か率のどちらかが入力ミスの可能性があります` : null };
@@ -92,6 +92,10 @@ window.Sim = window.Sim || {};
       if (r[0] > r[1] || r[1] > r[2]) w.push({ categoryId: c.id, code: 'later_rate_order', message: `${c.name}：後日追加率は累計なので 1年≦2年≦3年 が通常です（${r.join('→')}%）。入力をご確認ください` });
       if (a[0] > a[1] || a[1] > a[2]) w.push({ categoryId: c.id, code: 'later_aov_order', message: `${c.name}：後日追加単価は累計なので 1年≦2年≦3年 が通常です。入力をご確認ください` });
       if (c.newCustomers < MIN_BASE) w.push({ categoryId: c.id, code: 'small_base', message: `${c.name}：新規獲得人数が${MIN_BASE}人未満のため、診断は判定保留になります` });
+      const rateOutOfRange = c.sameDay.rate < 0 || c.sameDay.rate > 100 || r.some(v => v < 0 || v > 100);
+      if (rateOutOfRange) w.push({ categoryId: c.id, code: 'out_of_range', message: `${c.name}：追加率は0〜100%の範囲で入力します（計算は上限・下限で丸めています）` });
+      const negative = c.entryPrice < 0 || c.newCustomers < 0 || c.sameDay.aov < 0 || a.some(v => v < 0) || (c.daysToAddon != null && c.daysToAddon < 0);
+      if (negative) w.push({ categoryId: c.id, code: 'out_of_range', message: `${c.name}：金額・人数・日数は0以上で入力します（計算は0として扱っています）` });
     });
     return w;
   }

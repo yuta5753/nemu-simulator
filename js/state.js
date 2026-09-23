@@ -6,6 +6,7 @@ window.Sim = window.Sim || {};
   const uid = (prefix) => prefix + '_' + Date.now().toString(36) + '_' + (++seq);
   const num = (v, d) => (v === '' || v == null || isNaN(+v)) ? (d == null ? 0 : d) : +v;
   const optNum = (v) => (v === '' || v == null || isNaN(+v)) ? null : +v;
+  const safeId = (v, prefix) => { const s = String(v == null ? '' : v).replace(/[^A-Za-z0-9_-]/g, ''); return s || uid(prefix); };
 
   function emptyLevers() { return { newPct: 0, sameDayPt: 0, laterPt: 0, aovPct: 0, entryPricePct: 0 }; }
   function emptyPrev() {
@@ -22,7 +23,7 @@ window.Sim = window.Sim || {};
   function newCategory(o) {
     o = o || {};
     return {
-      id: o.id || uid('c'),
+      id: safeId(o.id, 'c'),
       name: o.name == null ? '新しい間口カテゴリ' : String(o.name),
       entryPrice: num(o.entryPrice, 0),
       newCustomers: num(o.newCustomers, 0),
@@ -35,7 +36,7 @@ window.Sim = window.Sim || {};
   }
   function newChannel(o) {
     o = o || {};
-    return { id: o.id || uid('ch'), name: o.name == null ? '新しい経路' : String(o.name), newCustomers: num(o.newCustomers, 0), cost: num(o.cost, 0) };
+    return { id: safeId(o.id, 'ch'), name: o.name == null ? '新しい経路' : String(o.name), newCustomers: num(o.newCustomers, 0), cost: num(o.cost, 0) };
   }
   const LEVER_KEYS = ['newPct', 'sameDayPt', 'laterPt', 'aovPct', 'entryPricePct'];
   const TACTIC_LEVERS = ['new', 'sameDay', 'later', 'aov', 'entryPrice'];
@@ -90,6 +91,10 @@ window.Sim = window.Sim || {};
     s.plan.activeScenario = 1;
     return s;
   }
+  function dedupeIds(list, prefix) {
+    const seen = new Set();
+    list.forEach(item => { if (seen.has(item.id)) item.id = uid(prefix); seen.add(item.id); });
+  }
   function normalize(obj) {
     if (!obj || typeof obj !== 'object') throw new Error('invalid');
     if (num(obj.version, 0) > SCHEMA_VERSION) throw new Error('unsupported version');
@@ -100,11 +105,13 @@ window.Sim = window.Sim || {};
       laterAov: [0, 1, 2].map(i => optNum(b.laterAov && b.laterAov[i])), daysToAddon: optNum(b.daysToAddon) };
     s.categories = Array.isArray(obj.categories) ? obj.categories.map(c => newCategory(c)) : [];
     s.channels = Array.isArray(obj.channels) ? obj.channels.map(c => newChannel(c)) : [];
+    dedupeIds(s.categories, 'c'); dedupeIds(s.channels, 'ch');
     s.plan.targetRevenue = [0, 1, 2].map(i => optNum(p.targetRevenue && p.targetRevenue[i]));
     const scs = (Array.isArray(p.scenarios) && p.scenarios.length) ? p.scenarios.slice(0, 3) : [{ name: '標準' }];
     s.plan.scenarios = scs.map(sc => newScenario(sc.name, s.categories, sc));
-    s.plan.activeScenario = Math.min(Math.max(0, num(p.activeScenario, 0)), s.plan.scenarios.length - 1);
+    s.plan.activeScenario = Math.min(Math.max(0, Math.round(num(p.activeScenario, 0))), s.plan.scenarios.length - 1);
     s.meta = { createdAt: (obj.meta && obj.meta.createdAt) || s.meta.createdAt, updatedAt: (obj.meta && obj.meta.updatedAt) || s.meta.updatedAt };
+    syncScenarios(s);
     return s;
   }
   function syncScenarios(state) {
