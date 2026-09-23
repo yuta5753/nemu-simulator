@@ -87,7 +87,7 @@ Sim.ui = Sim.ui || {};
     outputs(el, state); U().bindPanel(el, api, actions(api, el));
     if (!el.dataset.demoteBound) {
       el.dataset.demoteBound = '1';
-      el.addEventListener('input', e => { const t = e.target.closest('[data-demote]'); if (!t) return; api.update(s => { const tc = s.plan.scenarios[si].tactics[+t.dataset.demote]; if (tc && tc.libId) { tc.libId = null; tc.fromLibrary = false; } }); }, { once: false });
+      el.addEventListener('input', e => { const t = e.target.closest('[data-demote]'); if (!t) return; api.update(s => { const idx = s.plan.scenarios[s.plan.activeScenario] ? s.plan.activeScenario : 0; const tc = s.plan.scenarios[idx].tactics[+t.dataset.demote]; if (tc && tc.libId) { tc.libId = null; tc.fromLibrary = false; } }); }, { once: false });
     }
   }
   function outputs(el, state) {
