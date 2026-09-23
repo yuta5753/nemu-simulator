@@ -4,7 +4,7 @@ Sim.ui = Sim.ui || {};
   function getPath(obj, path) { return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj); }
   function setPath(obj, path, value) {
     const keys = path.split('.'); let o = obj;
-    for (let i = 0; i < keys.length - 1; i++) { if (o[keys[i]] == null) o[keys[i]] = {}; o = o[keys[i]]; }
+    for (let i = 0; i < keys.length - 1; i++) { if (o[keys[i]] == null) o[keys[i]] = /^\d+$/.test(keys[i + 1]) ? [] : {}; o = o[keys[i]]; }
     o[keys[keys.length - 1]] = value;
   }
   function parseValue(el) {

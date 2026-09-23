@@ -2,28 +2,29 @@ window.Sim = window.Sim || {};
 (function () {
   const $ = id => document.getElementById(id);
   const app = { state: null, step: 1, storage: null };
+  let reportDirty = true;
   function getStorage() { try { localStorage.setItem('__t', '1'); localStorage.removeItem('__t'); return localStorage; } catch (e) { return null; } }
   const mods = () => ({ 1: Sim.ui.input, 2: Sim.ui.diagnosis, 3: Sim.ui.plan, 4: Sim.ui.report });
   const api = { update, setStep, getState: () => app.state, get period() { return app.state.store.period; } };
   function persist() { if (app.storage) Sim.state.save(app.state, app.storage); }
   function applyGuide(el) { if (document.body.classList.contains('guide-open')) el.querySelectorAll('details.guide').forEach(d => { d.open = true; }); }
-  function update(fn, opts) { opts = opts || {}; fn(app.state); Sim.state.syncScenarios(app.state); persist(); if (opts.structural) renderStep(); else refreshStep(); }
+  function update(fn, opts) { opts = opts || {}; fn(app.state); Sim.state.syncScenarios(app.state); persist(); reportDirty = true; if (opts.structural) renderStep(); else refreshStep(); }
   function renderHeader() {
     const s = app.state.store; $('head-title').textContent = (s.name ? s.name + '｜' : '') + '売上シミュレーター';
     document.title = (s.name ? s.name + '｜' : '') + '店舗 売上シミュレーター';
     document.querySelectorAll('#periodbar button, #floatp button').forEach(b => b.classList.toggle('active', +b.dataset.p === s.period));
   }
-  function renderReportPanel() { if (app.step !== 4) Sim.ui.report.render($('panel-4'), app.state, api); }
-  function renderStep() { const el = $('panel-' + app.step); mods()[app.step].render(el, app.state, api); applyGuide(el); renderReportPanel(); renderHeader(); }
-  function refreshStep() { const el = $('panel-' + app.step); const m = mods()[app.step]; (m.refresh || m.render)(el, app.state, api); renderReportPanel(); renderHeader(); }
+  function renderStep() { const el = $('panel-' + app.step); mods()[app.step].render(el, app.state, api); applyGuide(el); renderHeader(); }
+  function refreshStep() { const el = $('panel-' + app.step); const m = mods()[app.step]; (m.refresh || m.render)(el, app.state, api); renderHeader(); }
   function setStep(n) {
     app.step = n;
     document.querySelectorAll('.step-panel').forEach(p => { p.hidden = +p.dataset.step !== n; });
     document.querySelectorAll('#stepper button').forEach(b => b.classList.toggle('active', +b.dataset.step === n));
     renderStep(); window.scrollTo({ top: 0 });
+    if (n === 4) reportDirty = false;
   }
   function setPeriod(p) { update(s => { s.store.period = p; }, { structural: true }); }
-  function replaceState(next) { app.state = next; Sim.state.syncScenarios(app.state); persist(); renderStep(); }
+  function replaceState(next) { app.state = next; Sim.state.syncScenarios(app.state); persist(); reportDirty = true; renderStep(); }
   function exportJson() {
     const blob = new Blob([Sim.state.serialize(app.state)], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = Sim.state.exportFilename(app.state);
@@ -38,6 +39,7 @@ window.Sim = window.Sim || {};
         replaceState(next);
       } catch (e) { alert(e.message === 'unsupported version' ? 'このファイルは新しい形式のため読み込めません。' : 'ファイルの形式が違います。'); }
     };
+    r.onerror = () => alert('ファイルを読み込めませんでした。');
     r.readAsText(file);
   }
   function init() {
@@ -51,12 +53,13 @@ window.Sim = window.Sim || {};
         if (a === 'export') exportJson();
         if (a === 'sample' && confirm('サンプルデータを読み込み、今の内容を置き換えます。よろしいですか？')) replaceState(Sim.state.createSample());
         if (a === 'reset' && confirm('空の状態から始めます。今の内容は消えます。よろしいですか？')) replaceState(Sim.state.createEmpty());
-        if (a === 'guide') { const open = document.body.classList.toggle('guide-open'); document.querySelectorAll('details.guide').forEach(d => { d.open = open; }); b.textContent = open ? 'ガイドを閉じる' : 'ガイドを開く'; }
+        if (a === 'guide') { const open = document.body.classList.toggle('guide-open'); document.querySelectorAll('details.guide').forEach(d => { d.open = open; }); b.textContent = open ? 'ガイドをすべて閉じる' : 'ガイドをすべて開く'; }
       };
     });
     $('import-file').addEventListener('change', e => { const f = e.target.files[0]; if (f) importJson(f); e.target.value = ''; });
     const fp = $('floatp'), anchor = $('periodbar');
     if ('IntersectionObserver' in window) new IntersectionObserver(es => es.forEach(e => fp.classList.toggle('hide', e.isIntersecting)), { threshold: 0 }).observe(anchor);
+    window.addEventListener('beforeprint', () => { if (reportDirty) { Sim.ui.report.render($('panel-4'), app.state, api); applyGuide($('panel-4')); reportDirty = false; } });
     setStep(1);
   }
   document.addEventListener('DOMContentLoaded', init);

@@ -83,25 +83,25 @@ Sim.ui = Sim.ui || {};
         </div>
       </details>`;
     outputs(el, state);
-    U().bindPanel(el, api, actions(api));
+    U().bindPanel(el, api, actions(api, el));
   }
-  function renderPreview(res, api) {
-    const { esc, fmt, fmt1 } = U(); const box = document.getElementById('paste-preview'); if (!box) return;
+  function renderPreview(res, api, el) {
+    const { esc, fmt, fmt1 } = U(); const box = el.querySelector('#paste-preview'); if (!box) return;
     const names = new Set(api.getState().categories.map(c => c.name));
     box.innerHTML = (res.warnings.length ? `<ul class="warn">${res.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : '') +
       (res.rows.length ? `<table class="ltable"><tr><th>カテゴリ</th><th>期間</th><th>新規</th><th>間口単価</th><th>同日率</th><th>同日単価</th><th>後日率</th><th>後日単価</th><th>実測LTV（参考）</th><th>扱い</th></tr>
         ${res.rows.map(r => `<tr><td>${esc(r.name)}</td><td>${r.period}年</td><td>${fmt(r.newCustomers)}</td><td>${fmt(r.entryPrice)}</td><td>${fmt1(r.sameDayRate)}</td><td>${fmt(r.sameDayAov)}</td><td>${fmt1(r.laterRate)}</td><td>${fmt(r.laterAov)}</td><td>${fmt(r.measuredLtv)}</td><td>${names.has(r.name) ? '上書き' : '追加'}</td></tr>`).join('')}</table>
         <button type="button" class="sbtn primary" data-action="paste-apply">取り込む</button>` : '<p class="note-p">取り込める行がありません。</p>');
   }
-  function actions(api) {
+  function actions(api, el) {
     return {
-      'add-category': () => api.update(s => { s.categories.push(Sim.state.newCategory({ name: '新しい間口カテゴリ', entryPrice: 8000, newCustomers: 30, later: [{ rate: 30, aov: 6000 }, { rate: 45, aov: 9000 }, { rate: 55, aov: 11000 }] })); }, { structural: true }),
+      'add-category': () => api.update(s => { s.categories.push(Sim.state.newCategory({ name: '新しい間口カテゴリ' })); }, { structural: true }),
       'del-category': d => { if (!confirm('この間口カテゴリを削除しますか？')) return; api.update(s => { s.categories.splice(+d.index, 1); }, { structural: true }); },
       'add-prev': d => api.update(s => { s.categories[+d.index].prev = Sim.state.emptyPrev(); }, { structural: true }),
       'del-prev': d => api.update(s => { s.categories[+d.index].prev = null; }, { structural: true }),
       'add-channel': () => api.update(s => { s.channels.push(Sim.state.newChannel()); }, { structural: true }),
       'del-channel': d => api.update(s => { s.channels.splice(+d.index, 1); }, { structural: true }),
-      'paste-preview': () => { const text = document.getElementById('paste-text').value; const res = Sim.paste.parse(text, { period: api.period }); pendingRows = res.rows; renderPreview(res, api); },
+      'paste-preview': () => { const text = el.querySelector('#paste-text').value; const res = Sim.paste.parse(text, { period: api.period }); pendingRows = res.rows; renderPreview(res, api, el); },
       'paste-apply': () => { if (!pendingRows || !pendingRows.length) return; const rows = pendingRows; pendingRows = null; api.update(s => { const r = Sim.paste.apply(s, rows); Object.assign(s, r.state); }, { structural: true }); }
     };
   }
