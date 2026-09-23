@@ -3,401 +3,66 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>寝具小売店 売上シミュレーター｜ねむねむはうす</title>
-<style>
-  :root{
-    --ink:#1a2236;--ink-soft:#2e3a55;--indigo:#3a5a8c;--indigo-bright:#5b82c4;
-    --gold:#b8924a;--gold-soft:#d9bd86;--washi:#f4efe4;--washi-deep:#ebe3d2;
-    --card:#fbf8f1;--line:#dcd2bd;--text:#2a2f3d;--text-soft:#6a6f7d;
-    --good:#3f8a6e;--bad:#c05a4a;
-    --shadow:0 1px 2px rgba(26,34,54,.06),0 8px 24px rgba(26,34,54,.07);
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{
-    font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
-    background:
-      radial-gradient(1200px 600px at 80% -10%, rgba(91,130,196,.10), transparent 60%),
-      radial-gradient(900px 500px at -10% 110%, rgba(184,146,74,.10), transparent 55%),
-      var(--washi);
-    color:var(--text);line-height:1.6;padding:0 0 80px;
-  }
-  .wrap{max-width:1180px;margin:0 auto;padding:0 20px}
-  header{
-    background:linear-gradient(135deg,var(--ink) 0%,var(--ink-soft) 60%,var(--indigo) 130%);
-    color:#fff;padding:38px 0 34px;margin-bottom:30px;border-bottom:3px solid var(--gold);
-    position:relative;overflow:hidden;
-  }
-  header::after{content:"";position:absolute;right:-60px;top:-60px;width:280px;height:280px;
-    background:radial-gradient(circle,rgba(217,189,134,.18),transparent 70%);border-radius:50%}
-  .eyebrow{font-size:12px;letter-spacing:.32em;color:var(--gold-soft);font-weight:700;margin-bottom:10px}
-  header h1{font-size:30px;font-weight:800;letter-spacing:.02em;line-height:1.3}
-  header p{color:#c9d2e2;font-size:14px;margin-top:10px;max-width:720px}
-  .periodbar{display:inline-flex;gap:4px;margin-top:20px;background:rgba(255,255,255,.08);padding:5px;border-radius:12px;border:1px solid rgba(217,189,134,.3)}
-  .periodbar button{background:transparent;border:none;color:#c9d2e2;font-weight:800;font-size:14px;
-    padding:9px 22px;border-radius:8px;cursor:pointer;font-family:inherit;transition:.15s}
-  .periodbar button.active{background:var(--gold);color:var(--ink)}
-  .periodbar button:not(.active):hover{color:#fff}
-  .sec-title{display:flex;align-items:center;gap:12px;margin:34px 0 16px;flex-wrap:wrap}
-  .sec-title .no{font-family:"Times New Roman",serif;font-size:13px;font-weight:700;color:#fff;
-    background:var(--indigo);width:26px;height:26px;border-radius:50%;display:grid;place-items:center;flex:none}
-  .sec-title h2{font-size:18px;font-weight:800;color:var(--ink)}
-  .sec-title .hint{font-size:12px;color:var(--text-soft)}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
-  .globals{display:grid;grid-template-columns:repeat(3,1fr);overflow:hidden}
-  .gbox{padding:18px 20px;border-right:1px solid var(--line)}
-  .gbox:last-child{border-right:none}
-  .gbox label{display:block;font-size:12px;color:var(--text-soft);font-weight:700;margin-bottom:8px}
-  .gbox .row{display:flex;align-items:baseline;gap:6px}
-  .gbox input{width:100%;font-size:22px;font-weight:800;color:var(--ink);border:none;background:transparent;
-    border-bottom:2px solid var(--line);padding:2px 0;font-family:inherit}
-  .gbox input:focus{outline:none;border-bottom-color:var(--gold)}
-  .gbox .unit{font-size:13px;color:var(--text-soft);font-weight:700;flex:none}
-  .products{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:18px}
-  .pcard{padding:0;overflow:hidden;display:flex;flex-direction:column}
-  .pcard-head{background:linear-gradient(100deg,var(--indigo),var(--indigo-bright));padding:14px 16px;display:flex;align-items:center;gap:10px}
-  .pcard-head .pname{flex:1;font-size:15px;font-weight:800;color:#fff;background:transparent;border:none;
-    border-bottom:1px dashed rgba(255,255,255,.5);font-family:inherit;padding:2px 0}
-  .pcard-head .pname:focus{outline:none;border-bottom-color:#fff}
-  .del{background:rgba(255,255,255,.15);border:none;color:#fff;width:24px;height:24px;border-radius:6px;
-    cursor:pointer;font-size:14px;line-height:1;flex:none;transition:.15s}
-  .del:hover{background:rgba(192,90,74,.85)}
-  .pcard-body{padding:14px 16px 16px}
-  .basebox{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
-  .field>.flabel{font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:6px;display:block}
-  .field>.flabel .q{color:var(--text-soft);font-weight:500;font-size:10px;display:block;margin-top:1px}
-  .inp{width:100%;font-size:15px;font-weight:700;color:var(--ink);border:1px solid var(--line);
-    border-radius:8px;padding:8px 10px;background:#fff;font-family:inherit}
-  .inp:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(184,146,74,.15)}
-  .subttl{font-size:12px;font-weight:800;color:var(--ink-soft);margin:6px 0 6px;display:flex;align-items:center;gap:6px}
-  .subttl::before{content:"＞";color:var(--gold);font-weight:800}
-  .yrtable{width:100%;border-collapse:collapse}
-  .yrtable th{font-size:11px;color:var(--text-soft);font-weight:700;padding:4px 4px;text-align:center;border-bottom:1px solid var(--line)}
-  .yrtable th:first-child{text-align:left}
-  .yrtable th.activecol{color:var(--gold);background:rgba(184,146,74,.12)}
-  .yrtable td{padding:5px 3px;text-align:center}
-  .yrtable td:first-child{text-align:left;font-size:12px;font-weight:700;color:var(--ink-soft);white-space:nowrap}
-  .yrtable td.activecol{background:rgba(184,146,74,.08)}
-  .yrtable input{width:100%;font-size:13px;font-weight:700;color:var(--ink);text-align:center;
-    border:1px solid var(--line);border-radius:6px;padding:5px 2px;background:#fff;font-family:inherit}
-  .yrtable input:focus{outline:none;border-color:var(--gold)}
-  .yrtable .note{font-size:10px;color:var(--text-soft);font-weight:500}
-  .pltv{background:var(--washi-deep);margin:14px -16px -16px;padding:12px 16px;border-top:1px solid var(--line)}
-  .pltv .pltv-row{display:flex;justify-content:space-between;font-size:12px;padding:2px 0}
-  .pltv .pltv-row span:first-child{color:var(--text-soft);font-weight:600}
-  .pltv .pltv-row span:last-child{font-weight:800;color:var(--ink)}
-  .pltv .pltv-total{border-top:1px dashed var(--line);margin-top:6px;padding-top:7px}
-  .pltv .pltv-total span:last-child{color:var(--indigo);font-size:15px}
-  .addbtn{width:100%;padding:14px;border:2px dashed var(--line);background:transparent;border-radius:14px;
-    color:var(--indigo);font-weight:800;font-size:14px;cursor:pointer;transition:.15s;font-family:inherit;margin-top:4px}
-  .addbtn:hover{border-color:var(--gold);background:rgba(184,146,74,.06)}
-  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-  .kpi{padding:18px 18px 16px;position:relative;overflow:hidden}
-  .kpi .klab{font-size:12px;color:var(--text-soft);font-weight:700;margin-bottom:8px}
-  .kpi .kval{font-size:25px;font-weight:800;color:var(--ink);letter-spacing:-.01em}
-  .kpi .kval .yen{font-size:14px;color:var(--text-soft);font-weight:700}
-  .kpi .ksub{font-size:11px;color:var(--text-soft);margin-top:4px}
-  .kpi.accent{background:linear-gradient(135deg,var(--ink),var(--indigo));border-color:var(--ink)}
-  .kpi.accent .klab{color:var(--gold-soft)}
-  .kpi.accent .kval,.kpi.accent .kval .yen{color:#fff}
-  .kpi.accent .ksub{color:#c9d2e2}
-  .cmpbars{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
-  .cbar{padding:16px;text-align:center;position:relative}
-  .cbar.active{border-color:var(--gold);box-shadow:0 0 0 2px rgba(184,146,74,.3),var(--shadow)}
-  .cbar .cl{font-size:13px;font-weight:800;color:var(--indigo);margin-bottom:10px}
-  .cbar.active .cl{color:var(--gold)}
-  .barwrap{height:130px;display:flex;align-items:flex-end;justify-content:center;margin-bottom:10px}
-  .bcol{width:46px;border-radius:6px 6px 0 0;background:linear-gradient(var(--indigo-bright),var(--indigo));transition:height .4s ease;min-height:2px}
-  .cbar.active .bcol{background:linear-gradient(var(--gold-soft),var(--gold))}
-  .cbar .cv{font-size:18px;font-weight:800;color:var(--ink)}
-  .cbar .cv .yen{font-size:12px;color:var(--text-soft)}
-  .cbar .csub{font-size:11px;color:var(--text-soft);margin-top:2px}
-  .sens-intro{font-size:13px;color:var(--text-soft);margin-bottom:14px;line-height:1.7}
-  .sctrl{padding:18px}
-  .sselect{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit;
-    font-size:13px;font-weight:700;color:var(--ink);background:#fff;margin-bottom:16px}
-  .sens-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-  .slider-row{margin-bottom:18px}
-  .slider-row .sl-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
-  .slider-row .sl-name{font-size:12px;font-weight:700;color:var(--ink-soft)}
-  .slider-row .sl-val{font-size:13px;font-weight:800;color:var(--gold)}
-  input[type=range]{-webkit-appearance:none;width:100%;height:6px;border-radius:6px;
-    background:linear-gradient(90deg,var(--gold-soft),var(--indigo-bright));outline:none}
-  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;
-    background:#fff;border:3px solid var(--indigo);cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.2)}
-  input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:3px solid var(--indigo);cursor:pointer}
-  .impact{background:linear-gradient(135deg,var(--ink),var(--indigo));border-radius:12px;padding:18px;color:#fff}
-  .impact .il{font-size:12px;color:var(--gold-soft);font-weight:700;margin-bottom:6px}
-  .impact .iv{font-size:28px;font-weight:800;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
-  .impact .iv .yen{font-size:14px;color:#c9d2e2;font-weight:700}
-  .impact .iv .delta{font-size:15px;padding:3px 10px;border-radius:20px;font-weight:800}
-  .impact .iv .delta.up{background:rgba(63,138,110,.35);color:#bdf0d8}
-  .impact .iv .delta.down{background:rgba(192,90,74,.35);color:#f5c8bf}
-  .impact .icompare{font-size:12px;color:#c9d2e2;margin-top:10px;display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,.15);padding-top:10px}
-  .sreset{background:transparent;border:1px solid var(--line);color:var(--text-soft);font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;cursor:pointer;font-family:inherit;margin-top:14px}
-  .sreset:hover{border-color:var(--gold);color:var(--ink)}
-  .footnote{font-size:11px;color:var(--text-soft);margin-top:30px;line-height:1.8;padding:16px 18px;background:rgba(255,255,255,.5);border-radius:10px;border:1px solid var(--line)}
-  .footnote b{color:var(--ink-soft)}
-  .floatp{position:fixed;right:18px;bottom:18px;z-index:50;background:rgba(26,34,54,.94);
-    backdrop-filter:blur(6px);border:1px solid var(--gold);border-radius:14px;padding:8px;
-    box-shadow:0 8px 30px rgba(0,0,0,.28);display:flex;flex-direction:column;gap:6px;
-    transition:opacity .25s,transform .25s}
-  .floatp .fpl{font-size:10px;color:var(--gold-soft);font-weight:700;text-align:center;letter-spacing:.1em;margin-bottom:1px}
-  .floatp .fprow{display:flex;gap:5px}
-  .floatp button{background:rgba(255,255,255,.08);border:none;color:#c9d2e2;font-weight:800;
-    font-size:13px;padding:8px 12px;border-radius:8px;cursor:pointer;font-family:inherit;transition:.15s;min-width:46px}
-  .floatp button.active{background:var(--gold);color:var(--ink)}
-  .floatp button:not(.active):hover{color:#fff;background:rgba(255,255,255,.16)}
-  .floatp.hide{opacity:0;transform:translateY(12px);pointer-events:none}
-  @media(max-width:880px){.floatp{right:12px;bottom:12px}.floatp button{padding:9px 14px}}
-  @media(max-width:880px){
-    .globals{grid-template-columns:1fr}.gbox{border-right:none;border-bottom:1px solid var(--line)}
-    .gbox:last-child{border-bottom:none}
-    .kpis{grid-template-columns:1fr 1fr}.cmpbars{grid-template-columns:1fr}.sens-grid{grid-template-columns:1fr}
-    .basebox{grid-template-columns:1fr}
-  }
-</style>
+<title>店舗 売上シミュレーター</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/print.css">
 </head>
 <body>
-<header>
+<header class="site-head">
   <div class="wrap">
-    <div class="eyebrow">NEMU NEMU HOUSE · SALES SIMULATOR</div>
-    <h1>寝具小売店 売上シミュレーター</h1>
-    <p>集客商品で入った新規顧客が、何年で見るとどれだけ売上を生むかを試算します。期間（1年／2年／3年）を切り替えると、その期間で見た累計の数字に切り替わります。追加購入率の母数は「新規獲得人数」です。</p>
-    <div class="periodbar" id="periodbar">
-      <button data-p="1">1年で見る</button>
-      <button data-p="2">2年で見る</button>
-      <button data-p="3" class="active">3年で見る</button>
+    <div class="eyebrow">STORE SALES SIMULATOR</div>
+    <div class="head-row">
+      <div>
+        <h1 id="head-title">店舗 売上シミュレーター</h1>
+        <p id="head-sub">現状の数字を入れて診断し、目標とレバー配分まで設計します。入力は自動保存されます。</p>
+      </div>
+      <div class="head-tools">
+        <button type="button" class="tbtn" data-app="export">書き出し（JSON）</button>
+        <label class="tbtn">読み込み<input type="file" id="import-file" accept="application/json,.json" hidden></label>
+        <button type="button" class="tbtn" data-app="sample">サンプルを読み込む</button>
+        <button type="button" class="tbtn" data-app="reset">空で始める</button>
+        <button type="button" class="tbtn" data-app="guide">ガイドを開く</button>
+      </div>
     </div>
+    <div class="periodbar" id="periodbar">
+      <button type="button" data-p="1">1年で見る</button>
+      <button type="button" data-p="2">2年で見る</button>
+      <button type="button" data-p="3" class="active">3年で見る</button>
+    </div>
+    <div class="notice" id="storage-notice" hidden>自動保存が無効です（プライベートモード等）。「書き出し」でファイルに保存してください。</div>
   </div>
 </header>
-<div class="wrap">
-  <div class="sec-title"><span class="no">1</span><h2>全体の前提</h2><span class="hint">店舗全体の数字を置きます</span></div>
-  <div class="card globals">
-    <div class="gbox"><label>原価率（物販）</label>
-      <div class="row"><input type="number" id="g_cogs" value="50" step="1"><span class="unit">%</span></div></div>
-    <div class="gbox"><label>固定費（任意・月額）</label>
-      <div class="row"><input type="number" id="g_fixed" value="0" step="10000"><span class="unit">円/月</span></div></div>
-    <div class="gbox"><label>現在の選択期間</label>
-      <div class="row"><span id="g_period_show" style="font-size:22px;font-weight:800;color:var(--indigo)">3年</span></div></div>
-  </div>
-  <div class="sec-title"><span class="no">2</span><h2>集客商品ごとの設計</h2>
-    <span class="hint">集客商品（最初の入口＝付帯品）＋その後の追加購入（新規人数が母数）</span></div>
-  <div class="products" id="products"></div>
-  <button class="addbtn" id="addProduct">＋ 集客商品を追加</button>
-  <div class="sec-title"><span class="no">3</span><h2>試算サマリー（<span id="sum_period">3年</span>で見た場合）</h2></div>
-  <div class="kpis">
-    <div class="kpi"><div class="klab">新規獲得（合計）</div>
-      <div class="kval"><span id="k_new">0</span><span class="yen"> 人</span></div>
-      <div class="ksub">全集客商品の新規</div></div>
-    <div class="kpi"><div class="klab">加重平均LTV（顧客あたり）</div>
-      <div class="kval"><span class="yen">¥</span><span id="k_ltv">0</span></div>
-      <div class="ksub" id="k_ltv_sub">集客＋追加購入の累計</div></div>
-    <div class="kpi"><div class="klab">期間累計 売上</div>
-      <div class="kval"><span class="yen">¥</span><span id="k_rev">0</span></div>
-      <div class="ksub">新規 × LTV</div></div>
-    <div class="kpi accent"><div class="klab">期間累計 粗利</div>
-      <div class="kval"><span class="yen">¥</span><span id="k_gp">0</span></div>
-      <div class="ksub" id="k_gp_sub">売上 ×（1 − 原価率）</div></div>
-  </div>
-  <div class="sec-title"><span class="no">4</span><h2>期間別の売上見込み比較</h2>
-    <span class="hint">1年・2年・3年で見たときの累計売上（クリックで切替）</span></div>
-  <div class="cmpbars" id="cmpbars"></div>
-  <div class="sec-title"><span class="no">5</span><h2>感度分析（What-if）</h2>
-    <span class="hint">選択中の期間で、何がどれだけ改善すると売上がいくら変わるか</span></div>
-  <div class="card sctrl">
-    <p class="sens-intro">対象の集客商品を選び、3つのレバーを動かすと、<b>選択中の期間</b>でのその商品の累計売上がどう変わるかを即時表示します。</p>
-    <select class="sselect" id="sensTarget"></select>
-    <div class="sens-grid">
-      <div>
-        <div class="slider-row"><div class="sl-top"><span class="sl-name">新規獲得人数</span><span class="sl-val" id="sv_new">±0%</span></div>
-          <input type="range" id="sl_new" min="-50" max="100" value="0" step="5"></div>
-        <div class="slider-row"><div class="sl-top"><span class="sl-name">追加購入率（選択期間）</span><span class="sl-val" id="sv_ret">±0pt</span></div>
-          <input type="range" id="sl_ret" min="-30" max="50" value="0" step="1"></div>
-        <div class="slider-row"><div class="sl-top"><span class="sl-name">追加購入単価</span><span class="sl-val" id="sv_aov">±0%</span></div>
-          <input type="range" id="sl_aov" min="-30" max="50" value="0" step="1"></div>
-        <button class="sreset" id="sensReset">基準値に戻す</button>
-      </div>
-      <div>
-        <div class="impact">
-          <div class="il">この商品の 累計売上（選択期間）</div>
-          <div class="iv"><span class="yen">¥</span><span id="sens_after">0</span><span class="delta up" id="sens_delta">±0</span></div>
-          <div class="icompare"><span>基準：¥<span id="sens_base">0</span></span><span>粗利インパクト：¥<span id="sens_gp">0</span></span></div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="footnote">
-    <b>計算の前提（仮置き）</b><br>
-    ・<b>LTV ＝ 集客商品単価 ＋（追加購入単価 × 追加購入率）</b>。追加購入率は新規獲得人数を母数とした割合です。<br>
-    ・追加購入の「単価」や「率」は、<b>1年で見た累計／2年で見た累計／3年で見た累計</b>をそれぞれ直接入力します（C方式）。期間スイッチで使う列が切り替わります。<br>
-    ・期間累計売上 ＝ 新規獲得人数 × LTV（選択期間）。<br>
-    ・固定費を入れると粗利から差し引いた営業利益を表示します（0なら非表示）。<br>
-    ・すべて仮の試算です。実数値を入れるほど精度が上がります。
-  </div>
-</div>
-
+<nav class="stepper wrap" id="stepper" aria-label="ステップ">
+  <button type="button" data-step="1" class="active"><span class="no">1</span>現状入力</button>
+  <button type="button" data-step="2"><span class="no">2</span>診断</button>
+  <button type="button" data-step="3"><span class="no">3</span>目標と戦略</button>
+  <button type="button" data-step="4"><span class="no">4</span>レポート</button>
+</nav>
+<main class="wrap">
+  <section class="step-panel" id="panel-1" data-step="1"></section>
+  <section class="step-panel" id="panel-2" data-step="2" hidden></section>
+  <section class="step-panel" id="panel-3" data-step="3" hidden></section>
+  <section class="step-panel" id="panel-4" data-step="4" hidden></section>
+  <div class="footnote">すべて試算です。実数値を入れるほど精度が上がります。ブラウザ内の自動保存は同じ端末・同じブラウザでしか残りません。持ち回るときは「書き出し」をお使いください。</div>
+</main>
 <div class="floatp hide" id="floatp">
   <div class="fpl">期間切替</div>
   <div class="fprow">
-    <button data-p="1">1年</button>
-    <button data-p="2">2年</button>
-    <button data-p="3" class="active">3年</button>
+    <button type="button" data-p="1">1年</button>
+    <button type="button" data-p="2">2年</button>
+    <button type="button" data-p="3" class="active">3年</button>
   </div>
 </div>
-<script>
-let products=[
-  {name:"枕（フィッティング）", front:12000, new1:40, aov:[15000,26000,34000], ret:[35,55,68]},
-  {name:"敷きもの・カバー類", front:6000, new1:60, aov:[5000,9000,12000], ret:[50,72,85]},
-];
-let period=3;
-const fmt=n=>Math.round(n).toLocaleString('ja-JP');
-const $=id=>document.getElementById(id);
-const pIdx=()=>period-1;
-
-function renderProducts(){
-  const wrap=$('products');wrap.innerHTML='';
-  products.forEach((p,i)=>{
-    const el=document.createElement('div');el.className='card pcard';
-    el.innerHTML=`
-      <div class="pcard-head">
-        <input class="pname" value="${p.name}" data-i="${i}" data-f="name">
-        <button class="del" data-del="${i}">✕</button>
-      </div>
-      <div class="pcard-body">
-        <div class="basebox">
-          <div class="field"><span class="flabel">集客商品単価<span class="q">入口の1回購入（円）</span></span>
-            <input class="inp" type="number" value="${p.front}" data-i="${i}" data-f="front"></div>
-          <div class="field"><span class="flabel">新規獲得人数<span class="q">この集客で入る人数</span></span>
-            <input class="inp" type="number" value="${p.new1}" data-i="${i}" data-f="new1"></div>
-        </div>
-        <div class="subttl">付帯品の追加購入（期間ごとの累計を入力）</div>
-        <table class="yrtable">
-          <tr><th></th><th class="col0">1年で</th><th class="col1">2年で</th><th class="col2">3年で</th></tr>
-          <tr><td>追加単価<span class="note"> 円</span></td>
-            ${[0,1,2].map(y=>`<td class="cell-${y}"><input type="number" value="${p.aov[y]}" data-i="${i}" data-f="aov" data-y="${y}"></td>`).join('')}</tr>
-          <tr><td>追加率<span class="note"> %</span></td>
-            ${[0,1,2].map(y=>`<td class="cell-${y}"><input type="number" value="${p.ret[y]}" data-i="${i}" data-f="ret" data-y="${y}"></td>`).join('')}</tr>
-        </table>
-        <div class="pltv" id="pltv-${i}"></div>
-      </div>`;
-    wrap.appendChild(el);
-  });
-  bindInputs();highlightCol();renderSensTarget();recompute();
-}
-function highlightCol(){
-  document.querySelectorAll('.yrtable th,.yrtable td').forEach(c=>c.classList.remove('activecol'));
-  document.querySelectorAll('.col'+pIdx()).forEach(c=>c.classList.add('activecol'));
-  document.querySelectorAll('.cell-'+pIdx()).forEach(c=>c.classList.add('activecol'));
-}
-function bindInputs(){
-  document.querySelectorAll('[data-f]').forEach(inp=>{
-    inp.oninput=e=>{
-      const i=+e.target.dataset.i,f=e.target.dataset.f;
-      if(f==='name'){products[i].name=e.target.value;renderSensTarget();}
-      else if(f==='front'){products[i].front=+e.target.value||0;}
-      else if(f==='new1'){products[i].new1=+e.target.value||0;}
-      else{const y=+e.target.dataset.y;products[i][f][y]=+e.target.value||0;}
-      recompute();
-    };
-  });
-  document.querySelectorAll('[data-del]').forEach(b=>{
-    b.onclick=e=>{products.splice(+e.target.dataset.del,1);renderProducts();};
-  });
-}
-function calcProduct(p,per,opts={}){
-  const idx=per-1;
-  const mNew=opts.mNew??1, mAov=opts.mAov??1, dRet=opts.dRet??0;
-  const newN=p.new1*mNew;
-  const front=p.front;
-  const subAov=p.aov[idx]*mAov;
-  const subRet=Math.max(0,(p.ret[idx]+dRet))/100;
-  const ltv=front + subAov*subRet;
-  const total=newN*ltv;
-  return {newN,ltv,total,front,subPart:subAov*subRet};
-}
-function recompute(){
-  const cogs=(+$('g_cogs').value||0)/100;
-  const fixedTotal=(+$('g_fixed').value||0)*12*period;
-  let totNew=0,totRev=0,totLtvW=0;
-  products.forEach((p,i)=>{
-    const r=calcProduct(p,period);
-    totNew+=r.newN;totRev+=r.total;totLtvW+=r.ltv*r.newN;
-    const box=$('pltv-'+i);
-    if(box){
-      box.innerHTML=
-        `<div class="pltv-row"><span>集客購入</span><span>¥${fmt(r.front)}</span></div>`+
-        `<div class="pltv-row"><span>追加購入ぶん（${period}年累計）</span><span>¥${fmt(r.subPart)}</span></div>`+
-        `<div class="pltv-row pltv-total"><span>顧客あたりLTV（${period}年）</span><span>¥${fmt(r.ltv)}</span></div>`;
-    }
-  });
-  const wLtv=totNew>0?totLtvW/totNew:0;
-  const gp=totRev*(1-cogs);
-  $('k_new').textContent=fmt(totNew);
-  $('k_ltv').textContent=fmt(wLtv);
-  $('k_ltv_sub').textContent=period+'年で見た累計';
-  $('k_rev').textContent=fmt(totRev);
-  $('k_gp').textContent=fmt(gp);
-  if(fixedTotal>0){
-    $('k_gp_sub').innerHTML=`粗利 ¥${fmt(gp)} − 固定費 ¥${fmt(fixedTotal)}<br><b style="color:#fff">営業利益 ¥${fmt(gp-fixedTotal)}</b>`;
-  }else{$('k_gp_sub').textContent='売上 ×（1 − 原価率）';}
-  const totals=[1,2,3].map(per=>products.reduce((s,p)=>s+calcProduct(p,per).total,0));
-  const maxT=Math.max(...totals,1);
-  const cb=$('cmpbars');cb.innerHTML='';
-  [1,2,3].forEach((per,k)=>{
-    const h=Math.max(2,(totals[k]/maxT)*120);
-    cb.innerHTML+=`
-      <div class="card cbar ${per===period?'active':''}" data-setp="${per}" style="cursor:pointer">
-        <div class="cl">${per}年で見る</div>
-        <div class="barwrap"><div class="bcol" style="height:${h}px"></div></div>
-        <div class="cv"><span class="yen">¥</span>${fmt(totals[k])}</div>
-        <div class="csub">粗利 ¥${fmt(totals[k]*(1-cogs))}</div>
-      </div>`;
-  });
-  document.querySelectorAll('[data-setp]').forEach(c=>c.onclick=()=>setPeriod(+c.dataset.setp));
-  $('g_period_show').textContent=period+'年';
-  $('sum_period').textContent=period+'年';
-  recomputeSens();
-}
-function setPeriod(p){
-  period=p;
-  document.querySelectorAll('#periodbar button, #floatp button').forEach(b=>b.classList.toggle('active',+b.dataset.p===p));
-  highlightCol();recompute();
-}
-function renderSensTarget(){
-  const sel=$('sensTarget');const cur=sel.value;
-  sel.innerHTML=products.map((p,i)=>`<option value="${i}">${p.name||'（無名）'}</option>`).join('');
-  if(cur&&+cur<products.length)sel.value=cur;
-}
-function recomputeSens(){
-  const i=+$('sensTarget').value||0;const p=products[i];if(!p)return;
-  const cogs=(+$('g_cogs').value||0)/100;
-  const mNew=1+(+$('sl_new').value)/100;
-  const mAov=1+(+$('sl_aov').value)/100;
-  const dRet=+$('sl_ret').value;
-  const base=calcProduct(p,period);
-  const after=calcProduct(p,period,{mNew,mAov,dRet});
-  const delta=after.total-base.total;
-  $('sv_new').textContent=(+$('sl_new').value>=0?'+':'')+$('sl_new').value+'%';
-  $('sv_ret').textContent=(+$('sl_ret').value>=0?'+':'')+$('sl_ret').value+'pt';
-  $('sv_aov').textContent=(+$('sl_aov').value>=0?'+':'')+$('sl_aov').value+'%';
-  $('sens_base').textContent=fmt(base.total);
-  $('sens_after').textContent=fmt(after.total);
-  const d=$('sens_delta');
-  d.textContent=(delta>=0?'+¥':'−¥')+fmt(Math.abs(delta));
-  d.className='delta '+(delta>=0?'up':'down');
-  $('sens_gp').textContent=fmt(delta*(1-cogs));
-}
-$('addProduct').onclick=()=>{products.push({name:"新しい集客商品",front:8000,new1:30,aov:[6000,9000,11000],ret:[30,45,55]});renderProducts();};
-['g_cogs','g_fixed'].forEach(id=>$(id).oninput=recompute);
-['sl_new','sl_ret','sl_aov'].forEach(id=>$(id).oninput=recomputeSens);
-$('sensTarget').onchange=recomputeSens;
-$('sensReset').onclick=()=>{['sl_new','sl_ret','sl_aov'].forEach(id=>$(id).value=0);recomputeSens();};
-document.querySelectorAll('#periodbar button').forEach(b=>b.onclick=()=>setPeriod(+b.dataset.p));
-document.querySelectorAll('#floatp button').forEach(b=>b.onclick=()=>setPeriod(+b.dataset.p));
-const fp=$('floatp'),anchor=$('periodbar');
-const io=new IntersectionObserver(es=>{es.forEach(e=>fp.classList.toggle('hide',e.isIntersecting));},{threshold:0});
-io.observe(anchor);
-renderProducts();
-</script>
+<script src="js/state.js"></script>
+<script src="js/calc.js"></script>
+<script src="js/analysis.js"></script>
+<script src="js/paste.js"></script>
+<script src="js/tactics.js"></script>
+<script src="js/ui-util.js"></script>
+<script src="js/ui-input.js"></script>
+<script src="js/ui-diagnosis.js"></script>
+<script src="js/ui-plan.js"></script>
+<script src="js/ui-report.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>
