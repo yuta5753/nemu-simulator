@@ -35,16 +35,20 @@ test('save/load: 保存して読める・storageが壊れていれば null/false
   eq(S.save(s, broken), false); eq(S.load(broken), null);
   eq(S.load({ getItem:()=>'{bad' }), null);
 });
-test('exportFilename: 店名_日付.json（記号は置換）', () => {
+test('exportFilename: 店名_日付.json（記号は置換・ローカル日付）', () => {
   const s = S.createEmpty(); s.store.name = 'A/B店';
-  eq(S.exportFilename(s, new Date('2026-09-23T00:00:00Z')), 'A_B店_20260923.json');
-  eq(S.exportFilename(S.createEmpty(), new Date('2026-09-23T00:00:00Z')), 'store_20260923.json');
+  eq(S.exportFilename(s, new Date(2026, 8, 23)), 'A_B店_20260923.json');
+  eq(S.exportFilename(S.createEmpty(), new Date(2026, 8, 23)), 'store_20260923.json');
 });
 test('syncScenarios: カテゴリ追加でレバーが生え、削除で消える', () => {
   const s = S.createSample(); const c = S.newCategory({name:'新'}); s.categories.push(c); S.syncScenarios(s);
   ok(s.plan.scenarios.every(sc => sc.levers[c.id]), '追加分のレバー');
   const removed = s.categories.shift().id; S.syncScenarios(s);
   ok(s.plan.scenarios.every(sc => !sc.levers[removed]), '削除分のレバーが消えている');
+});
+test('normalize: シナリオのレバーに不正値があっても数値に補正される', () => {
+  const s = S.normalize({version:2, categories:[{id:'c1', name:'X'}], plan:{scenarios:[{name:'S', levers:{c1:{newPct:'abc'}}}]}});
+  eq(s.plan.scenarios[0].levers.c1.newPct, 0);
 });
 test('emptyPrev: 全項目 null', () => {
   const p = S.emptyPrev(); eq(p.entryPrice, null); eq(p.later[2], {rate:null, aov:null}); eq(p.sameDay, {rate:null, aov:null});

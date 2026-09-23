@@ -37,6 +37,24 @@ window.Sim = window.Sim || {};
     });
     return { period, newTotal, revenue, grossProfit, fixedTotal, operatingProfit: fixedTotal > 0 ? grossProfit - fixedTotal : null, weightedLtv, categories: cats, channels };
   }
+  function solveRatePt(items, gap) {
+    const totalN = items.reduce((s, c) => s + c.n, 0);
+    const den = items.reduce((s, c) => s + c.n * c.aov, 0);
+    if (!(den > 0)) return null;
+    const f = pt => items.reduce((s, c) => s + c.n * c.aov * (clamp(c.rate + pt, 0, 100) - c.rate) / 100, 0);
+    const from = totalN > 0 ? items.reduce((s, c) => s + c.n * c.rate, 0) / totalN : 0;
+    const fMax = f(100), fMin = f(-100);
+    let neededPt, feasible;
+    if (gap > fMax) { neededPt = 100; feasible = false; }
+    else if (gap < fMin) { neededPt = -100; feasible = false; }
+    else {
+      let lo = -100, hi = 100;
+      for (let n = 0; n < 60; n++) { const mid = (lo + hi) / 2; if (f(mid) < gap) lo = mid; else hi = mid; }
+      neededPt = (lo + hi) / 2; feasible = true;
+    }
+    const to = totalN > 0 ? items.reduce((s, c) => s + c.n * clamp(c.rate + neededPt, 0, 100), 0) / totalN : 0;
+    return { neededPt, from, to, feasible };
+  }
   function reverse(state, period, target) {
     if (target == null || !(target > 0)) return null;
     const i = period - 1; const cats = state.categories; const sum = f => cats.reduce((s, c) => s + f(c), 0);
@@ -44,11 +62,9 @@ window.Sim = window.Sim || {};
     const out = { target, current, gap, levers: {} };
     const k = current > 0 ? target / current : null;
     out.levers.new = k == null ? null : { neededCount: totalNew * (k - 1), from: totalNew, to: totalNew * k, feasible: true };
-    const sdDen = sum(c => c.newCustomers * c.sameDay.aov); const wSd = totalNew > 0 ? sum(c => c.newCustomers * c.sameDay.rate) / totalNew : 0;
-    out.levers.sameDay = sdDen > 0 ? { neededPt: gap * 100 / sdDen, from: wSd, to: wSd + gap * 100 / sdDen, feasible: wSd + gap * 100 / sdDen <= 100 } : null;
+    out.levers.sameDay = solveRatePt(cats.map(c => ({ n: c.newCustomers, rate: c.sameDay.rate, aov: c.sameDay.aov })), gap);
     const lt = c => c.later[i] || { rate: 0, aov: 0 };
-    const ltDen = sum(c => c.newCustomers * lt(c).aov); const wLt = totalNew > 0 ? sum(c => c.newCustomers * lt(c).rate) / totalNew : 0;
-    out.levers.later = ltDen > 0 ? { neededPt: gap * 100 / ltDen, from: wLt, to: wLt + gap * 100 / ltDen, feasible: wLt + gap * 100 / ltDen <= 100 } : null;
+    out.levers.later = solveRatePt(cats.map(c => ({ n: c.newCustomers, rate: lt(c).rate, aov: lt(c).aov })), gap);
     const addonBase = sum(c => c.newCustomers * (c.sameDay.rate / 100 * c.sameDay.aov + lt(c).rate / 100 * lt(c).aov));
     out.levers.aov = addonBase > 0 ? { neededPct: gap / addonBase * 100, feasible: true } : null;
     const entryBase = sum(c => c.newCustomers * c.entryPrice);

@@ -9,7 +9,7 @@ test('portfolio: 2件は平均が境界。枕=主力、敷きもの=見直す', 
 test('portfolio: 3件は中央値が境界、母数10未満は判定保留', () => {
   const s = sample(); s.categories.push(Sim.state.newCategory({name:'小', entryPrice:20000, newCustomers:5, later:[{rate:0,aov:0},{rate:0,aov:0},{rate:90,aov:50000}]}));
   const pf = A.portfolio(s, 3); eq(pf.points[2].pending, true); eq(pf.points[2].quadrant, null); eq(pf.points[2].label, '判定保留');
-  approx(pf.xBoundary, 360000, 0.01, '中央値=敷きものの間口売上');
+  approx(pf.xBoundary, 420000, 0.01, '母数10未満を除いた2件の平均');
 });
 test('portfolio: 1件以下は available=false', () => {
   const s = sample(); s.categories = [s.categories[0]]; eq(A.portfolio(s, 3).available, false);
@@ -53,5 +53,5 @@ test('checks: 累計の順序と母数不足', () => {
 test('comments: 文章が出る・カテゴリ名を含む・空なら案内文', () => {
   const cm = A.comments(sample(), 3); ok(cm.length >= 4); ok(cm.some(c => c.includes('枕（フィッティング）') && c.includes('主力')));
   ok(cm.some(c => c.includes('目安値か前期')));
-  const e = A.comments(Sim.state.createEmpty(), 3); eq(e.length, 1);
+  const e = A.comments(Sim.state.createEmpty(), 3); eq(e, ['間口カテゴリを入力すると診断コメントが出ます。']);
 });

@@ -27,6 +27,15 @@ test('parse: 不正値の行は飛ばし、負の値は無視して警告', () =
   const r = P.parse('間口カテゴリ\t期間\t新規獲得数\t間口単価\n枕\t3\tabc\t100\n敷\t5\t10\t100\n\t3\t10\t100\n掛\t3\t10\t-5');
   eq(r.rows.length, 1); eq(r.rows[0].name, '掛'); eq(r.rows[0].entryPrice, null); eq(r.warnings.length, 4);
 });
+test('parse: 列数が見出しと合わない行は警告のうえ取り込める範囲で取り込む', () => {
+  const r = P.parse('間口カテゴリ\t期間\t新規獲得数\t間口単価\t後日追加率\n枕\t3\t40');
+  eq(r.rows.length, 1); eq(r.rows[0].entryPrice, null); eq(r.rows[0].laterRate, null);
+  eq(r.warnings.length, 1); ok(r.warnings[0].includes('列数'));
+});
+test('parse: カンマ区切りで引用符の対応が崩れている行は警告のうえ飛ばす', () => {
+  const r = P.parse('"カテゴリ","新規"\n"枕, 大",40');
+  eq(r.rows, []); eq(r.warnings.length, 1); ok(r.warnings[0].includes('引用符'));
+});
 test('apply: 名前一致は上書き、無ければ追加、シナリオのレバーも同期', () => {
   const s = Sim.state.createSample();
   const rows = [{name:'枕（フィッティング）', period:3, newCustomers:50, entryPrice:13000, sameDayRate:10, sameDayAov:3000, laterRate:70, laterAov:null, measuredLtv:null},

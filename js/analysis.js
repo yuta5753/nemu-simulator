@@ -10,9 +10,11 @@ window.Sim = window.Sim || {};
   function portfolio(state, period) {
     const cats = Sim.calc.store(state, period).categories;
     if (cats.length < 2) return { available: false, reason: cats.length ? '間口カテゴリが1件のため象限図は出しません（一覧をご覧ください）' : '間口カテゴリがありません', points: [] };
-    const xs = cats.map(c => c.entryRevenue), ys = cats.map(c => c.addonPerCustomer);
-    const xBoundary = cats.length === 2 ? (xs[0] + xs[1]) / 2 : median(xs);
-    const yBoundary = cats.length === 2 ? (ys[0] + ys[1]) / 2 : median(ys);
+    const nonPending = cats.filter(c => c.newN >= MIN_BASE);
+    const basis = nonPending.length >= 2 ? nonPending : cats;
+    const xs = basis.map(c => c.entryRevenue), ys = basis.map(c => c.addonPerCustomer);
+    const xBoundary = basis.length === 2 ? (xs[0] + xs[1]) / 2 : median(xs);
+    const yBoundary = basis.length === 2 ? (ys[0] + ys[1]) / 2 : median(ys);
     const points = cats.map(c => {
       const pending = c.newN < MIN_BASE; const hiX = c.entryRevenue >= xBoundary, hiY = c.addonPerCustomer >= yBoundary;
       const q = hiX && hiY ? 'core' : hiX ? 'entryOnly' : hiY ? 'hidden' : 'review';
@@ -94,6 +96,7 @@ window.Sim = window.Sim || {};
     return w;
   }
   function comments(state, period) {
+    if (!state.categories.length) return ['間口カテゴリを入力すると診断コメントが出ます。'];
     const out = []; const pf = portfolio(state, period); const lv = leverage(state, period); const wk = weakness(state, period); const tm = timing(state, period);
     if (pf.available) pf.points.forEach(p => {
       out.push(p.pending ? `${p.name}は新規獲得人数が${MIN_BASE}人未満のため、位置づけの判定は保留です。人数が増えてから判断してください。`

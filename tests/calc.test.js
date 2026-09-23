@@ -39,16 +39,19 @@ test('store: シナリオのレバーはカテゴリIDごとに効く', () => {
   const s = sample(); const lv = {}; lv[s.categories[0].id] = {newPct:10};
   approx(C.store(s, 3, lv).revenue, 2376800 + 140480, 0.01);
 });
-test('reverse: 目標280万（ギャップ423,200）の単独必要量', () => {
+test('reverse: 目標280万（ギャップ423,200）の単独必要量（後日追加率は上限クランプを考慮）', () => {
   const s = sample(); const r = C.reverse(s, 3, 2800000);
   approx(r.gap, 423200, 0.01);
   approx(r.levers.new.neededCount, 17.806, 0.01); eq(r.levers.new.from, 100); approx(r.levers.new.to, 117.806, 0.01);
   eq(r.levers.sameDay, null, '同日単価が全て0なら計算不能');
-  approx(r.levers.later.neededPt, 20.346, 0.01); approx(r.levers.later.from, 78.2, 0.01); ok(r.levers.later.feasible);
+  approx(r.levers.later.neededPt, 23.176, 0.01); approx(r.levers.later.from, 78.2, 0.01); approx(r.levers.later.to, 96.47, 0.01); ok(r.levers.later.feasible);
   approx(r.levers.aov.neededPct, 27.54, 0.01); approx(r.levers.entryPrice.neededPct, 50.38, 0.01);
+  const lv = {}; s.categories.forEach(c => { lv[c.id] = { laterPt: r.levers.later.neededPt }; });
+  approx(C.store(s, 3, lv).revenue, 2800000, 1);
 });
-test('reverse: 届かない率は feasible=false', () => {
-  const s = sample(); const r = C.reverse(s, 3, 4000000); eq(r.levers.later.feasible, false);
+test('reverse: 届かない率は feasible=false（上限クランプで到達不能）', () => {
+  const s = sample(); const r = C.reverse(s, 3, 4000000);
+  eq(r.levers.later.feasible, false); ok(r.levers.later.to <= 100);
 });
 test('reverse: 目標なし/0は null、目標＜現状は負のギャップ', () => {
   const s = sample(); eq(C.reverse(s, 3, null), null); eq(C.reverse(s, 3, 0), null);
@@ -64,7 +67,7 @@ test('reachRate: 目標に対する到達率', () => {
 });
 test('evenSplit: 計算できるレバーで等分', () => {
   const s = sample(); const lv = C.evenSplit(s, 3, 2800000); const l = lv[s.categories[0].id];
-  approx(l.newPct, 17.806/4, 0.01); eq(l.sameDayPt, 0); approx(l.laterPt, 20.346/4, 0.01); approx(l.aovPct, 27.54/4, 0.01); approx(l.entryPricePct, 50.38/4, 0.01);
+  approx(l.newPct, 17.806/4, 0.01); eq(l.sameDayPt, 0); approx(l.laterPt, 23.176/4, 0.01); approx(l.aovPct, 27.54/4, 0.01); approx(l.entryPricePct, 50.38/4, 0.01);
   eq(C.evenSplit(s, 3, null), {});
 });
 test('crmTargets: 同日と後日を独立の仮定で1本に束ねる', () => {

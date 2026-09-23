@@ -37,11 +37,18 @@ window.Sim = window.Sim || {};
     o = o || {};
     return { id: o.id || uid('ch'), name: o.name == null ? '新しい経路' : String(o.name), newCustomers: num(o.newCustomers, 0), cost: num(o.cost, 0) };
   }
+  const LEVER_KEYS = ['newPct', 'sameDayPt', 'laterPt', 'aovPct', 'entryPricePct'];
+  const TACTIC_LEVERS = ['new', 'sameDay', 'later', 'aov', 'entryPrice'];
+  function sanitizeLevers(raw) {
+    const l = emptyLevers(); const r = raw || {};
+    LEVER_KEYS.forEach(k => { l[k] = num(r[k], 0); });
+    return l;
+  }
   function newScenario(name, categories, o) {
     o = o || {}; const levers = {};
-    (categories || []).forEach(c => { levers[c.id] = Object.assign(emptyLevers(), (o.levers && o.levers[c.id]) || {}); });
+    (categories || []).forEach(c => { levers[c.id] = sanitizeLevers(o.levers && o.levers[c.id]); });
     const tactics = Array.isArray(o.tactics) ? o.tactics.map(t => ({
-      lever: t.lever || 'new', categoryId: t.categoryId == null ? null : t.categoryId, text: t.text == null ? '' : String(t.text),
+      lever: TACTIC_LEVERS.includes(t.lever) ? t.lever : 'new', categoryId: t.categoryId == null ? null : t.categoryId, text: t.text == null ? '' : String(t.text),
       owner: t.owner == null ? '' : String(t.owner), due: t.due == null ? '' : String(t.due), fromLibrary: !!t.fromLibrary
     })) : [];
     return { name: name || o.name || 'シナリオ', levers, tactics, memo: o.memo == null ? '' : String(o.memo) };
@@ -117,7 +124,9 @@ window.Sim = window.Sim || {};
   function save(state, storage) { try { storage.setItem(STORAGE_KEY, serialize(state)); return true; } catch (e) { return false; } }
   function load(storage) { try { const j = storage.getItem(STORAGE_KEY); return j ? parse(j) : null; } catch (e) { return null; } }
   function exportFilename(state, date) {
-    date = date || new Date(); const d = date.toISOString().slice(0, 10).replace(/-/g, '');
+    date = date || new Date();
+    const pad = v => String(v).padStart(2, '0');
+    const d = date.getFullYear() + pad(date.getMonth() + 1) + pad(date.getDate());
     const n = (state.store.name || 'store').replace(/[\\/:*?"<>|]/g, '_');
     return n + '_' + d + '.json';
   }
