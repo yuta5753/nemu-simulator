@@ -17,4 +17,6 @@
   .ltable { font-size: 11px; }
   .tag { border: 1px solid #1a2236; color: #1a2236 !important; background: #fff !important; }
   .qdot { fill-opacity: .5; }
+  .report .ltable, .report .lev, .report .kpi, .report .impact, .report .tm-row { break-inside: avoid; page-break-inside: avoid; }
+  .report .rpage h3 { break-after: avoid; page-break-after: avoid; }
 }

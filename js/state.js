@@ -49,7 +49,8 @@ window.Sim = window.Sim || {};
     (categories || []).forEach(c => { levers[c.id] = sanitizeLevers(o.levers && o.levers[c.id]); });
     const tactics = Array.isArray(o.tactics) ? o.tactics.map(t => ({
       lever: TACTIC_LEVERS.includes(t.lever) ? t.lever : 'new', categoryId: t.categoryId == null ? null : t.categoryId, text: t.text == null ? '' : String(t.text),
-      owner: t.owner == null ? '' : String(t.owner), due: t.due == null ? '' : String(t.due), fromLibrary: !!t.fromLibrary
+      owner: t.owner == null ? '' : String(t.owner), due: t.due == null ? '' : String(t.due), fromLibrary: !!t.fromLibrary,
+      libId: t.libId == null ? null : String(t.libId)
     })) : [];
     return { name: name || o.name || 'シナリオ', levers, tactics, memo: o.memo == null ? '' : String(o.memo) };
   }

@@ -16,7 +16,7 @@ Sim.ui = Sim.ui || {};
     const { fmt, fmt1, yen } = U();
     if (!r) return '<p class="note-p">目標売上を入れると、レバーごとの必要量が出ます。</p>';
     const L = r.levers; const na = '<td colspan="2">—（入力がないため計算できません）</td>'; const row = (name, cell) => `<tr><td>${name}</td>${cell}</tr>`;
-    const nf = ok => (ok ? '' : '（このレバー単独では届きません）');
+    const nf = ok => (ok ? '' : '　（このレバー単独では届きません）');
     const head = r.gap <= 0 ? `<div class="gapbox"><span>現状 ${yen(r.current)}</span><span>目標 ${yen(r.target)}</span><span class="ok">達成済み（余裕 ${yen(-r.gap)}）</span></div>`
       : `<div class="gapbox"><span>現状 ${yen(r.current)}</span><span>目標 ${yen(r.target)}</span><span class="gap">ギャップ ${yen(r.gap)}</span></div>`;
     return head + `<table class="ltable"><tr><th>レバー（単独で達成する場合）</th><th>必要量</th><th>今 → 必要値</th></tr>
@@ -28,8 +28,7 @@ Sim.ui = Sim.ui || {};
     </table>`;
   }
   function scenarioTabs(plan) {
-    const { esc } = U();
-    return `<div class="sc-tabs">${plan.scenarios.map((sc, i) => `<button type="button" class="${i === plan.activeScenario ? 'active' : ''}" data-action="sc-select" data-index="${i}">${esc(sc.name)}</button>`).join('')}
+    return `<div class="sc-tabs">${plan.scenarios.map((sc, i) => `<button type="button" class="${i === plan.activeScenario ? 'active' : ''}" data-action="sc-select" data-index="${i}"><span data-out="sc-tabname-${i}"></span></button>`).join('')}
       ${plan.scenarios.length < 3 ? '<button type="button" class="ghost" data-action="sc-add">＋ 追加</button>' : ''}</div>`;
   }
   function leverCards(state, sc, si) {
@@ -43,18 +42,20 @@ Sim.ui = Sim.ui || {};
   function tacticsBlock(sc, si, state) {
     const { esc } = U(); const lib = Sim.tactics.LIBRARY;
     return `<div class="tac-grid">${TACTIC_LEVERS.map(([k, label]) => `<div class="card pad"><h3 class="h3">${label}</h3><ul class="tac-lib">
-        ${lib[k].map(t => { const text = Sim.tactics.resolve(t, state); const chosen = sc.tactics.some(x => x.fromLibrary && x.lever === k && x.text === text);
-          return `<li><label><input type="checkbox" data-action="tac-toggle" data-lever="${k}" data-text="${esc(text)}" ${chosen ? 'checked' : ''}> ${esc(text)}</label></li>`; }).join('')}</ul>
+        ${lib[k].map((t, idx) => { const tid = k + '-' + idx; const text = Sim.tactics.resolve(t, state); const chosen = sc.tactics.some(x => x.libId === tid);
+          return `<li><label><input type="checkbox" data-action="tac-toggle" data-lever="${k}" data-tid="${tid}" ${chosen ? 'checked' : ''}> ${esc(text)}</label></li>`; }).join('')}</ul>
         <button type="button" class="sbtn" data-action="tac-add" data-lever="${k}">＋ 自由記述を追加</button></div>`).join('')}</div>
       <h3 class="h3">選んだ打ち手</h3>
       ${sc.tactics.length ? `<table class="ltable"><tr><th>レバー</th><th>打ち手</th><th>担当</th><th>期限</th><th></th></tr>
-        ${sc.tactics.map((t, i) => `<tr><td>${leverLabel(t.lever)}</td><td><input type="text" data-path="plan.scenarios.${si}.tactics.${i}.text" value="${esc(t.text)}" placeholder="打ち手を書く"></td><td><input type="text" data-path="plan.scenarios.${si}.tactics.${i}.owner" value="${esc(t.owner)}" placeholder="担当"></td><td><input type="text" data-path="plan.scenarios.${si}.tactics.${i}.due" value="${esc(t.due)}" placeholder="例 11月末"></td><td><button type="button" class="del dark" data-action="tac-del" data-index="${i}">✕</button></td></tr>`).join('')}</table>` : '<p class="note-p">まだ打ち手がありません。上の定型から選ぶか、自由記述を追加してください。</p>'}
-      <label class="flabel">メモ</label><textarea data-path="plan.scenarios.${si}.memo" rows="3">${esc(sc.memo)}</textarea>`;
+        ${sc.tactics.map((t, i) => { const idx = t.libId ? +t.libId.split('-').pop() : null; const libEntry = t.libId && lib[t.lever] && lib[t.lever][idx];
+          const textCell = libEntry ? esc(Sim.tactics.resolve(libEntry, state)) : `<input type="text" data-path="plan.scenarios.${si}.tactics.${i}.text" value="${esc(t.text)}" placeholder="打ち手を書く">`;
+          return `<tr><td>${leverLabel(t.lever)}</td><td>${textCell}</td><td><input type="text" data-path="plan.scenarios.${si}.tactics.${i}.owner" value="${esc(t.owner)}" placeholder="担当"></td><td><input type="text" data-path="plan.scenarios.${si}.tactics.${i}.due" value="${esc(t.due)}" placeholder="例 11月末"></td><td><button type="button" class="del dark" data-action="tac-del" data-index="${i}">✕</button></td></tr>`; }).join('')}</table>` : '<p class="note-p">まだ打ち手がありません。上の定型から選ぶか、自由記述を追加してください。</p>'}
+      <label class="flabel">メモ<textarea data-path="plan.scenarios.${si}.memo" rows="3">${esc(sc.memo)}</textarea></label>`;
   }
   function comparison(state, period) {
-    const { esc, yen, fmt1 } = U(); const t = state.plan.targetRevenue[period - 1];
+    const { esc, yen, fmt1 } = U();
     return `<table class="ltable"><tr><th>シナリオ</th><th>売上（${period}年累計）</th><th>粗利</th><th>目標到達率</th></tr>
-      ${state.plan.scenarios.map(sc => { const st = Sim.calc.store(state, period, sc.levers); return `<tr><td>${esc(sc.name)}</td><td>${yen(st.revenue)}</td><td>${yen(st.grossProfit)}</td><td>${t > 0 ? fmt1(st.revenue / t * 100) + '%' : '—'}</td></tr>`; }).join('')}</table>`;
+      ${state.plan.scenarios.map(sc => { const st = Sim.calc.store(state, period, sc.levers); const r = Sim.calc.reachRate(state, period, sc); return `<tr><td>${esc(sc.name)}</td><td>${yen(st.revenue)}</td><td>${yen(st.grossProfit)}</td><td>${r == null ? '—' : fmt1(r) + '%'}</td></tr>`; }).join('')}</table>`;
   }
   function crmBlock(state, period, sc) {
     const { esc } = U(); const rows = Sim.calc.crmTargets(state, period, sc);
@@ -83,14 +84,15 @@ Sim.ui = Sim.ui || {};
       <div class="sec-title"><span class="no">3</span><h2>打ち手</h2><span class="hint">レバーごとに定型から選ぶ＋自由記述。担当と期限を書けます</span></div>${tacticsBlock(sc, si, state)}
       <div class="sec-title"><span class="no">4</span><h2>シナリオ比較</h2></div><div class="card pad" data-out="compare"></div>
       ${crmBlock(state, period, sc)}`;
-    outputs(el, state); U().bindPanel(el, api, actions(api));
+    outputs(el, state); U().bindPanel(el, api, actions(api, el));
   }
   function outputs(el, state) {
-    const { yen, fmt1, signed } = U(); const period = state.store.period; const plan = state.plan; const sc = plan.scenarios[plan.activeScenario];
+    const { yen, fmt1, signed, esc } = U(); const period = state.store.period; const plan = state.plan; const sc = plan.scenarios[plan.activeScenario];
     const target = plan.targetRevenue[period - 1]; const base = Sim.calc.store(state, period); const now = Sim.calc.store(state, period, sc.levers);
     const set = (k, html) => { const n = el.querySelector(`[data-out="${k}"]`); if (n) n.innerHTML = html; };
+    plan.scenarios.forEach((s2, i) => set('sc-tabname-' + i, esc(s2.name)));
     set('cur-rev', yen(base.revenue));
-    const reach = target > 0 ? now.revenue / target * 100 : null;
+    const reach = Sim.calc.reachRate(state, period, sc);
     set('reach-val', reach == null ? '目標未設定' : fmt1(reach) + '%（' + yen(now.revenue) + '）');
     const rf = el.querySelector('[data-out="reach-fill"]'); if (rf) { rf.style.width = (reach == null ? 0 : Math.min(100, reach)) + '%'; rf.classList.toggle('ok', reach != null && reach >= 100); }
     set('reverse', reverseTable(Sim.calc.reverse(state, period, target)));
@@ -101,21 +103,29 @@ Sim.ui = Sim.ui || {};
     });
     set('compare', comparison(state, period));
   }
-  function actions(api) {
+  function actions(api, el) {
     return {
       'sc-select': d => api.update(s => { s.plan.activeScenario = +d.index; }, { structural: true }),
       'sc-add': () => api.update(s => { if (s.plan.scenarios.length >= 3) return; s.plan.scenarios.push(Sim.state.newScenario('シナリオ' + (s.plan.scenarios.length + 1), s.categories)); s.plan.activeScenario = s.plan.scenarios.length - 1; }, { structural: true }),
       'sc-copy': () => api.update(s => { if (s.plan.scenarios.length >= 3) return; const src = s.plan.scenarios[s.plan.activeScenario]; s.plan.scenarios.push(JSON.parse(JSON.stringify(Object.assign({}, src, { name: src.name + 'のコピー' })))); s.plan.activeScenario = s.plan.scenarios.length - 1; }, { structural: true }),
       'sc-del': () => { if (!confirm('このシナリオを削除しますか？')) return; api.update(s => { if (s.plan.scenarios.length <= 1) return; s.plan.scenarios.splice(s.plan.activeScenario, 1); s.plan.activeScenario = Math.max(0, s.plan.activeScenario - 1); }, { structural: true }); },
-      'sc-even': () => api.update(s => { const p = s.store.period; const lv = Sim.calc.evenSplit(s, p, s.plan.targetRevenue[p - 1]); const sc = s.plan.scenarios[s.plan.activeScenario];
-        Object.keys(lv).forEach(id => { const L = lv[id]; sc.levers[id] = { newPct: Math.round(L.newPct), sameDayPt: Math.round(L.sameDayPt), laterPt: Math.round(L.laterPt), aovPct: Math.round(L.aovPct), entryPricePct: Math.round(L.entryPricePct) }; }); }, { structural: true }),
+      'sc-even': () => {
+        const q = (v, L) => Math.max(L.min, Math.min(L.max, Math.round(v / L.step) * L.step));
+        let clamped = false;
+        api.update(s => { const p = s.store.period; const lv = Sim.calc.evenSplit(s, p, s.plan.targetRevenue[p - 1]); const sc = s.plan.scenarios[s.plan.activeScenario];
+          Object.keys(lv).forEach(id => { sc.levers[id] = LEVERS.reduce((o, L) => {
+            const raw = lv[id][L.key] || 0; const uq = Math.round(raw / L.step) * L.step; if (uq > L.max) clamped = true;
+            o[L.key] = q(raw, L); return o;
+          }, {}); }); }, { structural: true });
+        if (clamped) alert('目標が大きいため、一部のレバーは上限で止めています。');
+      },
       'sc-reset': () => api.update(s => { const sc = s.plan.scenarios[s.plan.activeScenario]; s.categories.forEach(c => { sc.levers[c.id] = Sim.state.emptyLevers(); }); }, { structural: true }),
-      'tac-toggle': (d, el) => api.update(s => { const sc = s.plan.scenarios[s.plan.activeScenario]; const idx = sc.tactics.findIndex(t => t.fromLibrary && t.lever === d.lever && t.text === d.text);
-        if (el.checked && idx < 0) sc.tactics.push({ lever: d.lever, categoryId: null, text: d.text, owner: '', due: '', fromLibrary: true });
-        if (!el.checked && idx >= 0) sc.tactics.splice(idx, 1); }, { structural: true }),
+      'tac-toggle': (d, chk) => api.update(s => { const sc = s.plan.scenarios[s.plan.activeScenario]; const idx = sc.tactics.findIndex(t => t.libId === d.tid);
+        if (chk.checked && idx < 0) sc.tactics.push({ lever: d.lever, categoryId: null, libId: d.tid, text: Sim.tactics.resolve(Sim.tactics.LIBRARY[d.lever][+d.tid.split('-').pop()], s), owner: '', due: '', fromLibrary: true });
+        if (!chk.checked && idx >= 0) sc.tactics.splice(idx, 1); }, { structural: true }),
       'tac-add': d => api.update(s => { s.plan.scenarios[s.plan.activeScenario].tactics.push({ lever: d.lever, categoryId: null, text: '', owner: '', due: '', fromLibrary: false }); }, { structural: true }),
       'tac-del': d => api.update(s => { s.plan.scenarios[s.plan.activeScenario].tactics.splice(+d.index, 1); }, { structural: true }),
-      'crm-copy': () => { const rows = Array.from(document.querySelectorAll('#crm-table tr')).map(tr => Array.from(tr.children).map(td => td.textContent.trim()).join('\t')).join('\n');
+      'crm-copy': () => { const rows = Array.from(el.querySelectorAll('#crm-table tr')).map(tr => Array.from(tr.children).map(td => td.textContent.trim()).join('\t')).join('\n');
         if (navigator.clipboard) navigator.clipboard.writeText(rows).then(() => alert('コピーしました'), () => alert('コピーできませんでした。表を選択して手動でコピーしてください。')); else alert('この環境ではコピーできません。表を選択して手動でコピーしてください。'); }
     };
   }

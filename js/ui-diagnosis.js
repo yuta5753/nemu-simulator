@@ -47,7 +47,7 @@ Sim.ui = Sim.ui || {};
         <div class="iv">${lv.store.top ? `${esc(lv.store.top.label)}<span class="delta up">${yen(lv.store.top.delta)} 増</span>` : '—'}</div></div>`;
   }
   function weaknessBlock(wk) {
-    const { esc, fmt1 } = U(); const modeLabel = { benchmark: '目安値との比較', prev: '前期との比較', relative: '店内の相対比較' }[wk.mode];
+    const { esc, fmt1 } = U(); const modeLabel = { benchmark: '目安値との比較', prev: '前期との比較', relative: '店内の相対比較' }[wk.mode] || '比較';
     return `<p class="note-p">物差し：${modeLabel}${wk.hint ? `　${esc(wk.hint)}` : ''}</p>` +
       (wk.items.length ? `<table class="ltable"><tr><th>間口カテゴリ</th><th>項目</th><th>実績</th><th>比較先</th><th>比率</th></tr>
         ${wk.items.map((it, i) => `<tr class="${i === 0 ? 'worst' : ''}"><td>${esc(it.name)}</td><td>${esc(it.metric)}</td><td>${fmt1(it.actual)}${it.unit}</td><td>${fmt1(it.reference)}${it.unit}</td><td>${fmt1(it.ratio * 100)}%</td></tr>`).join('')}</table>` : '<p class="note-p">比較できる項目がありません。</p>');

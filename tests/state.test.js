@@ -53,3 +53,7 @@ test('normalize: シナリオのレバーに不正値があっても数値に補
 test('emptyPrev: 全項目 null', () => {
   const p = S.emptyPrev(); eq(p.entryPrice, null); eq(p.later[2], {rate:null, aov:null}); eq(p.sameDay, {rate:null, aov:null});
 });
+test('normalize: シナリオの打ち手はlibIdを保持する', () => {
+  const s = S.normalize({version:2, categories:[{id:'c1', name:'X'}], plan:{scenarios:[{name:'S', tactics:[{lever:'later', libId:'later-0', text:'x', fromLibrary:true}]}]}});
+  eq(s.plan.scenarios[0].tactics[0].libId, 'later-0');
+});
