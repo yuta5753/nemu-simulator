@@ -528,6 +528,7 @@ test('parseKeyValues: ラベル揺れ・記号・前期プレフィックス・�
   eq(r.prev, { revenue: 40000000, 'costs.labor': 9000000 });
   eq(r.warnings.length, 2); ok(r.warnings[0].includes('謎の項目')); ok(r.warnings[1].includes('人件費'));
   eq(P.parseKeyValues('').values, {});
+  const e = P.parseKeyValues('前期 総売上\t\n家賃\t'); eq(e.values, {}); eq(e.prev, {}); eq(e.warnings, [], '値が空の行は警告なしで飛ばす');
 });
 test('applyKeyValues: 値を反映し、前期があれば prev を作る', () => {
   const s = Sim.state.createEmpty(); const r = P.applyKeyValues(s, P.parseKeyValues('総売上\t100\n仕入原価\t40\n前期 総売上\t90'));
@@ -556,8 +557,9 @@ Expected: 新規2件が ✗
     const values = {}, prev = {}, warnings = [];
     String(text || '').split(/\r?\n/).forEach((line, li) => {
       if (line.trim() === '') return;
-      const m = line.match(/^([^\t,]+)[\t,]\s*(.+)$/) || line.match(/^(\S+)[\s　]+(\S+)$/);
+      const m = line.match(/^([^\t,]+)[\t,]\s*(.*)$/) || line.match(/^(\S+)[\s　]+(\S+)$/);
       if (!m) { warnings.push(`${li + 1}行目：「項目名 TAB 値」の形になっていません`); return; }
+      if (m[2].trim() === '') return;   // 値が空の行（テンプレの未記入行）は黙って飛ばす
       let label = normLabel(m[1]); let isPrev = false;
       if (label.startsWith('前期')) { isPrev = true; label = label.slice(2); }
       const path = Object.keys(KV_LABELS).find(k => KV_LABELS[k].some(a => normLabel(a) === label));
