@@ -2,7 +2,7 @@ window.Sim = window.Sim || {};
 Sim.ui = Sim.ui || {};
 (function () {
   const U = () => Sim.ui.util;
-  const PER = ['1年で', '2年で', '3年で'];
+  const PER = ['12ヶ月', '24ヶ月', '36ヶ月'];
   let pendingRows = null;
 
   function prevFields(c, i) {
@@ -11,7 +11,7 @@ Sim.ui = Sim.ui || {};
       <div class="field"><span class="flabel">前期 間口単価</span><input class="inp" type="number" data-type="optnum" data-path="categories.${i}.prev.entryPrice" value="${val(p.entryPrice)}"></div>
       <div class="field"><span class="flabel">前期 新規獲得人数</span><input class="inp" type="number" data-type="optnum" data-path="categories.${i}.prev.newCustomers" value="${val(p.newCustomers)}"></div>
       <div class="field"><span class="flabel">前期 同日追加率 %</span><input class="inp" type="number" data-type="optnum" data-path="categories.${i}.prev.sameDay.rate" value="${val(p.sameDay.rate)}"></div>
-      <div class="field"><span class="flabel">前期 初回→追加購入日数</span><input class="inp" type="number" data-type="optnum" data-path="categories.${i}.prev.daysToAddon" value="${val(p.daysToAddon)}"></div>
+      <div class="field"><span class="flabel">前期 初回→追加購入（ヶ月）</span><input class="inp" type="number" data-type="months" data-path="categories.${i}.prev.daysToAddon" value="${U().months(p.daysToAddon)}"></div>
     </div>
     <table class="yrtable"><tr><th>前期 後日追加</th>${PER.map(p2 => `<th>${p2}</th>`).join('')}</tr>
       <tr><td>追加率<span class="note"> %</span></td>${[0, 1, 2].map(y => `<td><input type="number" data-type="optnum" data-path="categories.${i}.prev.later.${y}.rate" value="${val(p.later[y].rate)}"></td>`).join('')}</tr>
@@ -27,7 +27,7 @@ Sim.ui = Sim.ui || {};
           <div class="field"><span class="flabel">間口単価<span class="q">最初に買う商品の単価（円・単品）</span></span><input class="inp" type="number" min="0" data-type="num" data-path="categories.${i}.entryPrice" value="${val(c.entryPrice)}"></div>
           <div class="field"><span class="flabel">新規獲得人数<span class="q">この間口で初めて買う人数（1年分）</span></span><input class="inp" type="number" min="0" data-type="num" data-path="categories.${i}.newCustomers" value="${val(c.newCustomers)}"></div>
         </div>
-        <div class="subttl">後日追加（初回より後・期間ごとの累計）${guide('初回購入日より後に買った分です。率の母数は新規獲得人数、単価は「追加した人1人あたりの合計額」です。1年→2年→3年と累計なので、通常は増えていきます。')}</div>
+        <div class="subttl">後日追加（初回より後・期間ごとの累計）${guide('初回購入日より後に買った分です。率の母数は新規獲得人数、単価は「追加した人1人あたりの合計額」です。12→24→36ヶ月と累計なので、通常は増えていきます。')}</div>
         <table class="yrtable"><tr><th></th>${PER.map((p, y) => `<th class="${y === yi ? 'activecol' : ''}">${p}</th>`).join('')}</tr>
           <tr><td>追加率<span class="note"> %</span></td>${[0, 1, 2].map(y => `<td class="${y === yi ? 'activecol' : ''}"><input type="number" min="0" max="100" data-type="num" data-path="categories.${i}.later.${y}.rate" value="${val(c.later[y].rate)}"></td>`).join('')}</tr>
           <tr><td>追加単価<span class="note"> 円</span></td>${[0, 1, 2].map(y => `<td class="${y === yi ? 'activecol' : ''}"><input type="number" min="0" data-type="num" data-path="categories.${i}.later.${y}.aov" value="${val(c.later[y].aov)}"></td>`).join('')}</tr>
@@ -36,7 +36,7 @@ Sim.ui = Sim.ui || {};
           <div class="basebox">
             <div class="field"><span class="flabel">同日追加率<span class="q">初回購入日に間口以外も買った人の割合（%）</span></span><input class="inp" type="number" min="0" max="100" data-type="num" data-path="categories.${i}.sameDay.rate" value="${val(c.sameDay.rate)}"></div>
             <div class="field"><span class="flabel">同日追加単価<span class="q">同日に追加した人1人あたりの額（円）</span></span><input class="inp" type="number" min="0" data-type="num" data-path="categories.${i}.sameDay.aov" value="${val(c.sameDay.aov)}"></div>
-            <div class="field"><span class="flabel">初回→追加購入までの日数<span class="q">最初の後日追加までの平均日数</span></span><input class="inp" type="number" min="0" data-type="optnum" data-path="categories.${i}.daysToAddon" value="${val(c.daysToAddon)}"></div>
+            <div class="field"><span class="flabel">初回→追加購入までの期間<span class="q">最初の後日追加までの平均（ヶ月・小数可）</span></span><input class="inp" type="number" min="0" step="0.1" data-type="months" data-path="categories.${i}.daysToAddon" value="${U().months(c.daysToAddon)}"></div>
             <div class="field"><span class="flabel">主な展開商品<span class="q">この間口の次に売れる商品</span></span><input class="inp" type="text" data-path="categories.${i}.nextProducts" value="${esc(c.nextProducts)}"></div>
           </div>
         </details>
@@ -69,7 +69,7 @@ Sim.ui = Sim.ui || {};
       <details class="card optblock"><summary>目安値（任意）— 業界平均や自社の目標など、比べたい数字があれば</summary>
         <div class="optbody basebox">
           <div class="field"><span class="flabel">同日追加率の目安 %</span><input class="inp" type="number" data-type="optnum" data-path="benchmarks.sameDayRate" value="${val(b.sameDayRate)}"></div>
-          <div class="field"><span class="flabel">初回→追加購入日数の目安</span><input class="inp" type="number" data-type="optnum" data-path="benchmarks.daysToAddon" value="${val(b.daysToAddon)}"></div>
+          <div class="field"><span class="flabel">初回→追加購入の目安（ヶ月）</span><input class="inp" type="number" data-type="months" data-path="benchmarks.daysToAddon" value="${U().months(b.daysToAddon)}"></div>
           ${[0, 1, 2].map(y => `<div class="field"><span class="flabel">後日追加率の目安（${PER[y]}）%</span><input class="inp" type="number" data-type="optnum" data-path="benchmarks.laterRate.${y}" value="${val(b.laterRate[y])}"></div>`).join('')}
           ${[0, 1, 2].map(y => `<div class="field"><span class="flabel">後日追加単価の目安（${PER[y]}）円</span><input class="inp" type="number" data-type="optnum" data-path="benchmarks.laterAov.${y}" value="${val(b.laterAov[y])}"></div>`).join('')}
         </div>
@@ -112,9 +112,9 @@ Sim.ui = Sim.ui || {};
     const { yen, fmt, esc } = U(); const period = state.store.period; const st = Sim.calc.store(state, period);
     st.categories.forEach(c => {
       const box = el.querySelector(`[data-out="ltv-${c.id}"]`);
-      if (box) box.innerHTML = `<div class="pltv-row"><span>間口購入</span><span>${yen(c.entryPrice)}</span></div><div class="pltv-row"><span>同日追加ぶん</span><span>${yen(c.sameDayPart)}</span></div><div class="pltv-row"><span>後日追加ぶん（${period}年累計）</span><span>${yen(c.laterPart)}</span></div><div class="pltv-row pltv-total"><span>顧客あたりLTV（${period}年）</span><span>${yen(c.ltv)}</span></div>`;
+      if (box) box.innerHTML = `<div class="pltv-row"><span>間口購入</span><span>${yen(c.entryPrice)}</span></div><div class="pltv-row"><span>同日追加ぶん</span><span>${yen(c.sameDayPart)}</span></div><div class="pltv-row"><span>後日追加ぶん（${U().PERIOD_LABEL(period)}累計）</span><span>${yen(c.laterPart)}</span></div><div class="pltv-row pltv-total"><span>顧客あたりLTV（${U().PERIOD_LABEL(period)}）</span><span>${yen(c.ltv)}</span></div>`;
     });
-    st.channels.forEach(ch => { const td = el.querySelector(`[data-out="cpa-${ch.id}"]`); if (td) td.textContent = ch.cpa == null ? '—' : '¥' + fmt(ch.cpa); });
+    st.channels.forEach(ch => { const td = el.querySelector(`[data-out="cpa-${ch.id}"]`); if (td) td.textContent = yen(ch.cpa); });
     const w = Sim.analysis.checks(state); const wb = el.querySelector('[data-out="warnings"]');
     if (wb) wb.innerHTML = w.length ? `<ul class="warn">${w.map(x => `<li>${esc(x.message)}</li>`).join('')}</ul>` : '';
   }

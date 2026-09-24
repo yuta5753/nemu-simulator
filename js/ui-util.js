@@ -11,6 +11,9 @@ Sim.ui = Sim.ui || {};
     const t = (el.dataset && el.dataset.type) || 'str'; const v = el.type === 'checkbox' ? el.checked : el.value;
     if (t === 'num') { const n = +v; return (v === '' || isNaN(n)) ? 0 : n; }
     if (t === 'optnum') { if (v === '' || v == null) return null; const n = +v; return isNaN(n) ? null : n; }
+    if (t === 'man') { if (v === '' || v == null) return null; const n = +v; return isNaN(n) ? null : Math.round(n * 10000); }
+    if (t === 'man0') { const n = +v; return (v === '' || isNaN(n)) ? 0 : Math.round(n * 10000); }
+    if (t === 'months') { if (v === '' || v == null) return null; const n = +v; return isNaN(n) ? null : Math.round(n * 30); }
     if (t === 'bool') return !!v;
     return v;
   }
@@ -33,9 +36,18 @@ Sim.ui = Sim.ui || {};
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => (n == null || isNaN(n)) ? '—' : Math.round(n).toLocaleString('ja-JP');
   const fmt1 = n => (n == null || isNaN(n)) ? '—' : (Math.round(n * 10) / 10).toLocaleString('ja-JP', { maximumFractionDigits: 1 });
-  const yen = n => (n == null || isNaN(n)) ? '—' : '¥' + fmt(n);
+  const trim1 = v => (Math.round(v * 10) / 10).toLocaleString('ja-JP', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+  const yen = n => {
+    if (n == null || isNaN(n)) return '—'; const a = Math.abs(n); const sign = n < 0 ? '−' : '';
+    if (a < 10000) return sign + Math.round(a).toLocaleString('ja-JP') + '円';
+    if (a >= 100000000) return sign + trim1(a / 100000000) + '億円';
+    return sign + trim1(a / 10000) + '万円';
+  };
+  const man = n => (n == null || isNaN(n)) ? '' : Math.round(n / 10000 * 10) / 10;
+  const months = d => (d == null || isNaN(d)) ? '' : Math.round(d / 30 * 10) / 10;
+  const PERIOD_LABEL = p => (p * 12) + 'ヶ月';
   const signed = (n, unit, digits) => { if (n == null || isNaN(n)) return '—'; const v = digits ? fmt1(n) : fmt(n); return (n >= 0 ? '+' : '') + v + (unit || ''); };
   const val = v => (v == null ? '' : v);
   const guide = text => `<details class="guide"><summary aria-label="説明">？</summary><div>${text}</div></details>`;
-  Sim.ui.util = { getPath, setPath, parseValue, bindPanel, esc, fmt, fmt1, yen, signed, val, guide };
+  Sim.ui.util = { getPath, setPath, parseValue, bindPanel, esc, fmt, fmt1, yen, man, months, PERIOD_LABEL, signed, val, guide };
 })();

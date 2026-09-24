@@ -6,7 +6,7 @@ Sim.ui = Sim.ui || {};
     const { yen, fmt } = U();
     return `<div class="kpis">
       <div class="kpi"><div class="klab">新規獲得（合計）</div><div class="kval">${fmt(st.newTotal)}<span class="yen"> 人</span></div><div class="ksub">全間口カテゴリの新規</div></div>
-      <div class="kpi"><div class="klab">加重平均LTV（顧客あたり）</div><div class="kval">${yen(st.weightedLtv)}</div><div class="ksub">${st.period}年で見た累計</div></div>
+      <div class="kpi"><div class="klab">加重平均LTV（顧客あたり）</div><div class="kval">${yen(st.weightedLtv)}</div><div class="ksub">${U().PERIOD_LABEL(st.period)}累計</div></div>
       <div class="kpi"><div class="klab">期間累計 売上</div><div class="kval">${yen(st.revenue)}</div><div class="ksub">新規 × LTV</div></div>
       <div class="kpi accent"><div class="klab">期間累計 粗利</div><div class="kval">${yen(st.grossProfit)}</div><div class="ksub">${st.operatingProfit != null ? `固定費 ${yen(st.fixedTotal)} → 営業利益 <b>${yen(st.operatingProfit)}</b>` : '売上 ×（1 − 原価率）'}</div></div>
     </div>`;
@@ -57,7 +57,7 @@ Sim.ui = Sim.ui || {};
     if (!tm.length) return '<p class="note-p">①で「初回→追加購入までの日数」を入れると、フォローの打ち時が出ます。</p>';
     const max = Math.max(...tm.map(t => t.days), 1);
     return tm.map(t => `<div class="tm-row"><div class="tm-name">${esc(t.name)}</div>
-      <div class="tm-bar"><div class="tm-fill" style="width:${Math.min(100, t.days / max * 100)}%"></div><span>${t.days}日</span></div>
+      <div class="tm-bar"><div class="tm-fill" style="width:${Math.min(100, t.days / max * 100)}%"></div><span>${t.days}日（約${U().months(t.days)}ヶ月）</span></div>
       <div class="tm-touch">${t.touchpoints.map(p => `${p.label}：${p.day}日目`).join(' ／ ')}</div>${t.warning ? `<div class="warn-inline">${esc(t.warning)}</div>` : ''}</div>`).join('');
   }
   function render(el, state) {
@@ -65,7 +65,7 @@ Sim.ui = Sim.ui || {};
     const st = Sim.calc.store(state, period); const pf = Sim.analysis.portfolio(state, period); const lv = Sim.analysis.leverage(state, period);
     const wk = Sim.analysis.weakness(state, period); const tm = Sim.analysis.timing(state, period); const cm = Sim.analysis.comments(state, period);
     el.innerHTML = `
-      <div class="sec-title"><span class="no">1</span><h2>現状サマリー（${period}年で見た場合）</h2></div>${kpis(st)}<div class="card pad">${table(st)}</div>
+      <div class="sec-title"><span class="no">1</span><h2>現状サマリー（${U().PERIOD_LABEL(period)}で見た場合）</h2></div>${kpis(st)}<div class="card pad">${table(st)}</div>
       <div class="sec-title"><span class="no">2</span><h2>間口ポートフォリオ</h2><span class="hint">横＝集客力、縦＝展開力。境界は店内の中央値${guide('横軸は「新規×間口単価」（入口としてどれだけ売上を作るか）、縦軸は「LTV−間口単価」（入口の後に1人がどれだけ追加で買うか）です。境界は店内カテゴリの中央値なので、他店との比較ではなく自店内の相対的な位置づけです。')}</span></div><div class="card pad">${quadrantSvg(pf)}</div>
       <div class="sec-title"><span class="no">3</span><h2>効きどころ</h2><span class="hint">標準的な改善幅を当てたとき、どのレバーが売上を最も動かすか</span></div>${leverageBlock(lv)}
       <div class="sec-title"><span class="no">4</span><h2>弱点候補</h2><span class="hint">${guide('目安値（①の任意欄）があればそれと、前期の数字があればそれと比較します。どちらも無い場合は店内の加重平均より低い率を挙げます。')}</span></div><div class="card pad">${weaknessBlock(wk)}</div>

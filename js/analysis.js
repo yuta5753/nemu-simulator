@@ -5,7 +5,13 @@ window.Sim = window.Sim || {};
   const LEVER_LABELS = { newPct: '新規獲得人数', sameDayPt: '同日追加率', laterPt: '後日追加率', aovPct: '追加単価', entryPricePct: '間口単価' };
   const QUADRANT_LABELS = { core: '主力（伸ばす）', entryOnly: '入口止まり（育てる）', hidden: '隠れた優良間口（集客を寄せる）', review: '見直す' };
   const median = arr => { const a = arr.slice().sort((x, y) => x - y); const n = a.length; if (!n) return 0; return n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2; };
-  const yen = n => '¥' + Math.round(n).toLocaleString('ja-JP');
+  const trim1 = v => (Math.round(v * 10) / 10).toLocaleString('ja-JP', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+  const yen = n => {
+    if (n == null || isNaN(n)) return '—'; const a = Math.abs(n); const sign = n < 0 ? '−' : '';
+    if (a < 10000) return sign + Math.round(a).toLocaleString('ja-JP') + '円';
+    if (a >= 100000000) return sign + trim1(a / 100000000) + '億円';
+    return sign + trim1(a / 10000) + '万円';
+  };
 
   function portfolio(state, period) {
     const cats = Sim.calc.store(state, period).categories;

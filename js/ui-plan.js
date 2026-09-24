@@ -52,7 +52,7 @@ Sim.ui = Sim.ui || {};
   }
   function comparison(state, period) {
     const { esc, yen, fmt1 } = U();
-    return `<table class="ltable"><tr><th>シナリオ</th><th>売上（${period}年累計）</th><th>粗利</th><th>目標到達率</th></tr>
+    return `<table class="ltable"><tr><th>シナリオ</th><th>売上（${U().PERIOD_LABEL(period)}累計）</th><th>粗利</th><th>目標到達率</th></tr>
       ${state.plan.scenarios.map(sc => { const st = Sim.calc.store(state, period, sc.levers); const r = Sim.calc.reachRate(state, period, sc); return `<tr><td>${esc(sc.name)}</td><td>${yen(st.revenue)}</td><td>${yen(st.grossProfit)}</td><td>${r == null ? '—' : fmt1(r) + '%'}</td></tr>`; }).join('')}</table>`;
   }
   function crmBlock(state, period, sc) {
@@ -68,10 +68,10 @@ Sim.ui = Sim.ui || {};
     const si = plan.scenarios[plan.activeScenario] ? plan.activeScenario : 0; const sc = plan.scenarios[si] || plan.scenarios[0];
     sc.tactics.forEach(t => { if (t.libId) { const idx = +t.libId.split('-').pop(); const entry = Sim.tactics.LIBRARY[t.lever] && Sim.tactics.LIBRARY[t.lever][idx]; if (entry) t.text = Sim.tactics.resolve(entry, state); } });
     el.innerHTML = `
-      <div class="sec-title"><span class="no">1</span><h2>目標設定と逆算（${period}年で見た場合）</h2><span class="hint">${guide('期間累計の目標売上を入れると、現状とのギャップと「レバー1本だけで埋める場合の必要量」が出ます。実際は複数のレバーを組み合わせるので、下のシナリオで配分します。')}</span></div>
+      <div class="sec-title"><span class="no">1</span><h2>目標設定と逆算（${U().PERIOD_LABEL(period)}で見た場合）</h2><span class="hint">${guide('期間累計の目標売上を入れると、現状とのギャップと「レバー1本だけで埋める場合の必要量」が出ます。実際は複数のレバーを組み合わせるので、下のシナリオで配分します。')}</span></div>
       <div class="card globals">
-        <div class="gbox"><label>目標売上（${period}年累計）</label><div class="row"><input type="number" min="0" step="100000" data-type="optnum" data-path="plan.targetRevenue.${period - 1}" value="${val(plan.targetRevenue[period - 1])}"><span class="unit">円</span></div></div>
-        <div class="gbox"><label>現状の売上（${period}年累計）</label><div class="row"><span class="bigval" data-out="cur-rev"></span></div></div>
+        <div class="gbox"><label>目標売上（${U().PERIOD_LABEL(period)}累計）</label><div class="row"><input type="number" min="0" step="10" data-type="man" data-path="plan.targetRevenue.${period - 1}" value="${U().man(plan.targetRevenue[period - 1])}"><span class="unit">万円</span></div></div>
+        <div class="gbox"><label>現状の売上（${U().PERIOD_LABEL(period)}累計）</label><div class="row"><span class="bigval" data-out="cur-rev"></span></div></div>
         <div class="gbox"><label>目標到達率（選択中シナリオ）</label><div class="reach"><div class="reach-bar"><div class="reach-fill" data-out="reach-fill"></div></div><span data-out="reach-val"></span></div></div>
       </div>
       <div class="card pad" data-out="reverse"></div>
