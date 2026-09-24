@@ -4,13 +4,16 @@ Sim.ui = Sim.ui || {};
   const U = () => Sim.ui.util;
   let pendingKv = null;
   function nf(labelHtml, path, value, opts) {
-    const { val, man } = U(); opts = opts || {}; const isMan = !!opts.man;
-    return `<div class="field"><span class="flabel">${labelHtml}</span><input class="inp" type="number" min="0"${opts.max != null ? ` max="${opts.max}"` : ''}${opts.step ? ` step="${opts.step}"` : (isMan ? ' step="0.1"' : '')} data-type="${isMan ? 'man' : 'optnum'}" data-path="${path}" value="${isMan ? man(value) : val(value)}"></div>`;
+    const { val, man } = U(); opts = opts || {}; const isMan = !!opts.man; const isRate = !!opts.rate;
+    const maxAttr = opts.max != null ? opts.max : (isRate ? 100 : null);
+    const stepAttr = opts.step || ((isRate || isMan) ? '0.1' : null);
+    return `<div class="field"><span class="flabel">${labelHtml}</span><input class="inp" type="number" min="0"${maxAttr != null ? ` max="${maxAttr}"` : ''}${stepAttr ? ` step="${stepAttr}"` : ''} data-type="${isMan ? 'man' : 'optnum'}" data-path="${path}" value="${isMan ? man(value) : val(value)}"></div>`;
   }
   function numericBlocks(prefix, m, tag) {
     const g = p => `${prefix}.${p}`; const { guide } = U(); const t = tag || '';
+    const badge = n => t ? '' : `<span class="no">${n}</span>`;
     return `
-      <div class="sec-title"><span class="no">1</span><h2>売上の全体像${t}</h2><span class="hint">年次（直近の決算期）${guide('レジの年間集計や決算書から。「新規客数」「新規客売上」は顧客IDで初回購入を判定できることが前提です。無ければ新規会員登録数で代用してください。')}</span></div>
+      <div class="sec-title">${badge(1)}<h2>売上の全体像${t}</h2><span class="hint">年次（直近の決算期）${guide('レジの年間集計や決算書から。「新規客数」「新規客売上」は顧客IDで初回購入を判定できることが前提です。無ければ新規会員登録数で代用してください。')}</span></div>
       <div class="card pad"><div class="basebox mg4">
         ${nf('総売上（年）<span class="q">万円。税込／税抜は店内で統一</span>', g('revenue'), m.revenue, { man: true })}
         ${nf('購入客数（延べ）<span class="q">人</span>', g('buyers'), m.buyers)}
@@ -18,7 +21,7 @@ Sim.ui = Sim.ui || {};
         ${nf('新規客売上<span class="q">万円</span>', g('newRevenue'), m.newRevenue, { man: true })}
         ${nf('買上点数（任意）<span class="q">1人あたり</span>', g('itemsPerBuyer'), m.itemsPerBuyer, { step: '0.1' })}
       </div><div class="autovals" data-out="${prefix}-auto-sales"></div></div>
-      <div class="sec-title"><span class="no">2</span><h2>顧客の構成${t}</h2><span class="hint">${guide('アクティブ顧客＝過去2年以内に購入した人。来店回数別はその内訳です（合計がアクティブ顧客数と一致するのが理想）。')}</span></div>
+      <div class="sec-title">${badge(2)}<h2>顧客の構成${t}</h2><span class="hint">${guide('アクティブ顧客＝過去2年以内に購入した人。来店回数別はその内訳です（合計がアクティブ顧客数と一致するのが理想）。')}</span></div>
       <div class="card pad"><div class="basebox mg4">
         ${nf('アクティブ顧客数<span class="q">過去2年以内に購入</span>', g('activeCustomers'), m.activeCustomers)}
         ${nf('来店1回の客数', g('visits.once'), m.visits.once)}
@@ -26,7 +29,7 @@ Sim.ui = Sim.ui || {};
         ${nf('来店3回以上の客数', g('visits.threePlus'), m.visits.threePlus)}
         ${nf('休眠客数（任意）<span class="q">2年以上来店なし</span>', g('dormant'), m.dormant)}
       </div><div class="autovals" data-out="${prefix}-auto-cust"></div></div>
-      <div class="sec-title"><span class="no">3</span><h2>費用の構造${t}</h2><span class="hint">年額${guide('決算書・試算表から。粗利率＝（売上−仕入原価）÷売上、損益分岐点売上＝固定費÷粗利率で計算します。')}</span></div>
+      <div class="sec-title">${badge(3)}<h2>費用の構造${t}</h2><span class="hint">年額${guide('決算書・試算表から。粗利率＝（売上−仕入原価）÷売上、損益分岐点売上＝固定費÷粗利率で計算します。')}</span></div>
       <div class="card pad"><div class="basebox mg4">
         ${nf('仕入原価<span class="q">万円</span>', g('costs.cogs'), m.costs.cogs, { man: true })}
         ${nf('人件費<span class="q">万円</span>', g('costs.labor'), m.costs.labor, { man: true })}
@@ -35,7 +38,8 @@ Sim.ui = Sim.ui || {};
         ${nf('その他経費<span class="q">万円</span>', g('costs.other'), m.costs.other, { man: true })}
         ${nf('期末在庫金額（任意）<span class="q">万円</span>', g('inventory'), m.inventory, { man: true })}
       </div><div class="autovals" data-out="${prefix}-auto-cost"></div></div>
-      <div class="sec-title"><span class="no">4</span><h2>集客効率${t}</h2><span class="hint">任意</span></div>
+      ${t ? '' : '<p class="note-p">仕入原価と総売上が入ると、②の原価率はここから自動で決まります（②の手入力より優先）。固定費（月額）は②で任意入力のままです。</p>'}
+      <div class="sec-title">${badge(4)}<h2>集客効率${t}</h2><span class="hint">任意</span></div>
       <div class="card pad"><div class="basebox mg4">
         ${nf('予約数', g('funnel.reservations'), m.funnel.reservations)}
         ${nf('来店数', g('funnel.visits'), m.funnel.visits)}
@@ -46,7 +50,7 @@ Sim.ui = Sim.ui || {};
     const { esc, val, man, guide } = U();
     return `<div class="sec-title"><span class="no">5</span><h2>商品・粗利</h2><span class="hint">カテゴリ別の売上と粗利率${guide('売上の内訳と粗利率をカテゴリごとに。②の間口カテゴリ名を取り込んでから、足りない行を追加できます。')}</span></div>
       <div class="card pad"><table class="ltable"><tr><th>カテゴリ</th><th>売上（年・万円）</th><th>粗利率（%）</th><th>売上シェア</th><th>粗利貢献</th><th></th></tr>
-        ${m.products.map((p, i) => `<tr><td><input type="text" data-path="mgmt.products.${i}.name" value="${esc(p.name)}" placeholder="カテゴリ名"></td><td><input type="number" min="0" step="0.1" data-type="man" data-path="mgmt.products.${i}.sales" value="${man(p.sales)}"></td><td><input type="number" min="0" max="100" data-type="optnum" data-path="mgmt.products.${i}.grossMarginPct" value="${val(p.grossMarginPct)}"></td><td data-out="mg-prod-share-${p.id}"></td><td data-out="mg-prod-contrib-${p.id}"></td><td><button type="button" class="del dark" data-action="mg-del-product" data-index="${i}">✕</button></td></tr>`).join('')}
+        ${m.products.map((p, i) => `<tr><td><input type="text" data-path="mgmt.products.${i}.name" value="${esc(p.name)}" placeholder="カテゴリ名"></td><td><input type="number" min="0" step="0.1" data-type="man" data-path="mgmt.products.${i}.sales" value="${man(p.sales)}"></td><td><input type="number" min="0" max="100" step="0.1" data-type="optnum" data-path="mgmt.products.${i}.grossMarginPct" value="${val(p.grossMarginPct)}"></td><td data-out="mg-prod-share-${p.id}"></td><td data-out="mg-prod-contrib-${p.id}"></td><td><button type="button" class="del dark" data-action="mg-del-product" data-index="${i}">✕</button></td></tr>`).join('')}
       </table>
       <button type="button" class="sbtn" data-action="mg-import-categories">②の間口カテゴリ名を取り込む</button><button type="button" class="sbtn" data-action="mg-add-product">＋ 行を追加</button>
       <div class="autovals" data-out="mg-auto-inv"></div></div>`;
@@ -67,9 +71,9 @@ Sim.ui = Sim.ui || {};
       <p class="note-p">経路の新規合計と間口カテゴリの新規合計は一致しなくて構いません。</p></div>`;
   }
   function render(el, state, api) {
-    const { esc, val } = U(); const m = state.mgmt; const b = state.benchmarks;
+    const m = state.mgmt; const b = state.benchmarks;
     el.innerHTML = `
-      <p class="note-p">店全体の数字を年次で入れます。すべて任意ですが、★の付いた「総売上・新規客数・新規客売上・仕入原価・人件費・家賃・広告宣伝費・その他経費」が揃うと診断が出ます。分からない項目は空欄のままで構いません。</p>
+      <p class="note-p">店全体の数字を年次で入れます。すべて任意ですが、総売上・新規客数・新規客売上・仕入原価・人件費・家賃・広告宣伝費・その他経費の8項目が揃うと診断が出ます。分からない項目は空欄のままで構いません。</p>
       ${numericBlocks('mgmt', m, '')}
       ${channelsBlock(state)}
       ${productsBlock(m)}
@@ -79,11 +83,11 @@ Sim.ui = Sim.ui || {};
         ${m.prev ? numericBlocks('mgmt.prev', m.prev, '（前期）') + '<button type="button" class="sbtn" data-action="mg-del-prev">前期の欄を消す</button>' : '<button type="button" class="sbtn" data-action="mg-add-prev">前期の欄を追加</button>'}
       </div></details>
       <details class="card optblock"><summary>経営数値の目安値（任意）— 自社目標や過去平均など、比べたい基準があれば</summary><div class="optbody basebox mg4">
-        ${nf('粗利率の目安 %', 'benchmarks.grossMarginPct', b.grossMarginPct, { max: 100 })}
-        ${nf('人件費率の目安 %', 'benchmarks.laborPct', b.laborPct, { max: 100 })}
-        ${nf('家賃比率の目安 %', 'benchmarks.rentPct', b.rentPct, { max: 100 })}
-        ${nf('広告費率の目安 %', 'benchmarks.adsPct', b.adsPct, { max: 100 })}
-        ${nf('リピート率の目安 %', 'benchmarks.repeatRate', b.repeatRate, { max: 100 })}
+        ${nf('粗利率の目安 %', 'benchmarks.grossMarginPct', b.grossMarginPct, { rate: true })}
+        ${nf('人件費率の目安 %', 'benchmarks.laborPct', b.laborPct, { rate: true })}
+        ${nf('家賃比率の目安 %', 'benchmarks.rentPct', b.rentPct, { rate: true })}
+        ${nf('広告費率の目安 %', 'benchmarks.adsPct', b.adsPct, { rate: true })}
+        ${nf('リピート率の目安 %', 'benchmarks.repeatRate', b.repeatRate, { rate: true })}
       </div></details>
       <details class="card optblock"><summary>貼り付け（項目名と値の2列）— 収集シートの「経営数値」をそのまま貼れます</summary><div class="optbody">
         <p class="note-p">1行に「項目名 TAB 値」。金額は<b>万円</b>で（円で貼っても自動で判定します）。項目名：総売上／購入客数／新規客数／新規客売上／買上点数／アクティブ顧客数／来店1回／来店2回／来店3回以上／休眠客数／期末在庫／仕入原価／人件費／家賃／広告宣伝費／その他経費／予約数／来店数／成約数。先頭に「前期 」を付けると前期の欄に入ります。カテゴリ別の売上・粗利率と買替は表に直接入力してください。</p>
@@ -102,10 +106,10 @@ Sim.ui = Sim.ui || {};
   function actions(api, el) {
     return {
       'mg-add-product': () => api.update(s => { s.mgmt.products.push(Sim.state.newProductRow()); }, { structural: true }),
-      'mg-del-product': d => api.update(s => { s.mgmt.products.splice(+d.index, 1); }, { structural: true }),
+      'mg-del-product': d => { if (!confirm('この行を削除しますか？')) return; api.update(s => { s.mgmt.products.splice(+d.index, 1); }, { structural: true }); },
       'mg-import-categories': () => api.update(s => { const names = new Set(s.mgmt.products.map(p => p.name)); s.categories.forEach(c => { if (!names.has(c.name)) s.mgmt.products.push(Sim.state.newProductRow({ name: c.name })); }); }, { structural: true }),
       'mg-add-rep': () => api.update(s => { s.mgmt.replacement.push(Sim.state.newReplacementRow()); }, { structural: true }),
-      'mg-del-rep': d => api.update(s => { s.mgmt.replacement.splice(+d.index, 1); }, { structural: true }),
+      'mg-del-rep': d => { if (!confirm('この行を削除しますか？')) return; api.update(s => { s.mgmt.replacement.splice(+d.index, 1); }, { structural: true }); },
       'add-channel': () => api.update(s => { s.channels.push(Sim.state.newChannel()); }, { structural: true }),
       'del-channel': d => api.update(s => { s.channels.splice(+d.index, 1); }, { structural: true }),
       'mg-add-prev': () => api.update(s => { s.mgmt.prev = Sim.state.normalizeMgmt({}, false); }, { structural: true }),
