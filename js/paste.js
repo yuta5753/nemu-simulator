@@ -110,6 +110,7 @@ window.Sim = window.Sim || {};
   const normLabel = s => String(s == null ? '' : s).replace(/[\s　"]/g, '').replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
   function parseKeyValues(text) {
     const values = {}, prev = {}, warnings = [];
+    const manValues = new Set(), manPrev = new Set();
     String(text || '').split(/\r?\n/).forEach((line, li) => {
       if (line.trim() === '') return;
       const m = line.match(/^([^\t,]+)[\t,]\s*(.*)$/) || line.match(/^(\S+)[\s　]+(\S+)$/);
@@ -119,15 +120,26 @@ window.Sim = window.Sim || {};
       if (label.startsWith('前期')) { isPrev = true; label = label.slice(2); }
       const path = Object.keys(KV_LABELS).find(k => KV_LABELS[k].some(a => normLabel(a) === label));
       if (!path) { warnings.push(`${li + 1}行目：「${m[1].trim()}」は認識できない項目のため飛ばしました`); return; }
-      const valStr = m[2].trim().replace(/万円?$/, '');
+      const rawVal = m[2].trim();
+      const hasMan = /万円?$/.test(rawVal);
+      const valStr = rawVal.replace(/万円?$/, '');
       const v = toNum(valStr);
       if (v == null) { warnings.push(`${li + 1}行目：「${m[1].trim()}」の値が数字ではありません`); return; }
       (isPrev ? prev : values)[path] = v;
+      if (hasMan) (isPrev ? manPrev : manValues).add(path);
     });
-    // 金額は万円で受ける。1,000,000以上の金額があれば円で貼られたとみなす
-    const amounts = [].concat(Object.keys(values).filter(k => AMOUNT_KEYS.includes(k)).map(k => values[k]), Object.keys(prev).filter(k => AMOUNT_KEYS.includes(k)).map(k => prev[k]));
-    if (amounts.some(v => v >= 1000000)) { warnings.push('金額が大きいため、円で貼られたものとして取り込みました（万円で貼ると小数も使えます）'); }
-    else { [values, prev].forEach(o => Object.keys(o).forEach(k => { if (AMOUNT_KEYS.includes(k)) o[k] = Math.round(o[k] * 10000); })); }
+    // 金額は万円で受ける。明示的な「万」表記を除いて1,000,000以上の金額があれば円で貼られたとみなす
+    const amounts = [].concat(
+      Object.keys(values).filter(k => AMOUNT_KEYS.includes(k) && !manValues.has(k)).map(k => values[k]),
+      Object.keys(prev).filter(k => AMOUNT_KEYS.includes(k) && !manPrev.has(k)).map(k => prev[k])
+    );
+    if (amounts.some(v => v >= 1000000)) {
+      warnings.push('金額が大きいため、円で貼られたものとして取り込みました（万円で貼ると小数も使えます）');
+      Object.keys(values).forEach(k => { if (AMOUNT_KEYS.includes(k) && manValues.has(k)) values[k] = Math.round(values[k] * 10000); });
+      Object.keys(prev).forEach(k => { if (AMOUNT_KEYS.includes(k) && manPrev.has(k)) prev[k] = Math.round(prev[k] * 10000); });
+    } else {
+      [values, prev].forEach(o => Object.keys(o).forEach(k => { if (AMOUNT_KEYS.includes(k)) o[k] = Math.round(o[k] * 10000); }));
+    }
     return { values, prev, warnings };
   }
   function setDeep(obj, path, value) { const keys = path.split('.'); let o = obj; for (let i = 0; i < keys.length - 1; i++) { if (o[keys[i]] == null) o[keys[i]] = {}; o = o[keys[i]]; } o[keys[keys.length - 1]] = value; }

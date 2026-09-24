@@ -54,7 +54,7 @@ Sim.ui = Sim.ui || {};
   }
   function timingBlock(tm) {
     const { esc } = U();
-    if (!tm.length) return '<p class="note-p">①で「初回→追加購入までの日数」を入れると、フォローの打ち時が出ます。</p>';
+    if (!tm.length) return '<p class="note-p">②で「初回→追加購入までの期間」を入れると、フォローの打ち時が出ます。</p>';
     const max = Math.max(...tm.map(t => t.days), 1);
     return tm.map(t => `<div class="tm-row"><div class="tm-name">${esc(t.name)}</div>
       <div class="tm-bar"><div class="tm-fill" style="width:${Math.min(100, t.days / max * 100)}%"></div><span>${t.days}日（約${U().months(t.days)}ヶ月）</span></div>
@@ -166,7 +166,7 @@ Sim.ui = Sim.ui || {};
       <div class="sec-title"><span class="no">1</span><h2>現状サマリー（${U().PERIOD_LABEL(period)}で見た場合）</h2></div>${kpis(st)}<div class="card pad">${table(st)}</div>
       <div class="sec-title"><span class="no">2</span><h2>間口ポートフォリオ</h2><span class="hint">横＝集客力、縦＝展開力。境界は店内の中央値${guide('横軸は「新規×間口単価」（入口としてどれだけ売上を作るか）、縦軸は「LTV−間口単価」（入口の後に1人がどれだけ追加で買うか）です。境界は店内カテゴリの中央値なので、他店との比較ではなく自店内の相対的な位置づけです。')}</span></div><div class="card pad">${quadrantSvg(pf)}</div>
       <div class="sec-title"><span class="no">3</span><h2>効きどころ</h2><span class="hint">標準的な改善幅を当てたとき、どのレバーが売上を最も動かすか</span></div>${leverageBlock(lv)}
-      <div class="sec-title"><span class="no">4</span><h2>弱点候補</h2><span class="hint">${guide('目安値（①の任意欄）があればそれと、前期の数字があればそれと比較します。どちらも無い場合は店内の加重平均より低い率を挙げます。')}</span></div><div class="card pad">${weaknessBlock(wk)}</div>
+      <div class="sec-title"><span class="no">4</span><h2>弱点候補</h2><span class="hint">${guide('目安値（②の任意欄）があればそれと、前期の数字があればそれと比較します。どちらも無い場合は店内の加重平均より低い率を挙げます。')}</span></div><div class="card pad">${weaknessBlock(wk)}</div>
       <div class="sec-title"><span class="no">5</span><h2>購入までの期間とフォローの打ち時</h2></div><div class="card pad">${timingBlock(tm)}</div>
       <div class="sec-title"><span class="no">6</span><h2>診断コメント</h2></div><div class="card pad"><ul class="cm">${cm.map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>`;
   }

@@ -91,3 +91,7 @@ test('mgmtComments: 文章が出る・空なら案内文', () => {
   ok(cm.some(c => c.includes('損益分岐点'))); ok(cm.some(c => c.includes('売上 +10%')));
   eq(A.mgmtComments(Sim.state.createEmpty()), ['①経営数値を入れると経営の健康度が出ます。']);
 });
+test('mgmtComments: 総売上のみでは何も言えることがなく、空コメント案内文が出る', () => {
+  const s = Sim.state.createEmpty(); s.mgmt.revenue = 10000000;
+  eq(A.mgmtComments(s), ['費用の構造や顧客の構成を入れると、ここにコメントが出ます。']);
+});

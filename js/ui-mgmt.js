@@ -101,7 +101,7 @@ Sim.ui = Sim.ui || {};
     const labelOf = p => (Sim.paste.KV_LABELS[p] || [p])[0];
     const rows = Object.keys(res.values).map(p => `<tr><td>${esc(labelOf(p))}</td><td>${fmt(res.values[p])}</td></tr>`).concat(Object.keys(res.prev).map(p => `<tr><td>前期 ${esc(labelOf(p))}</td><td>${fmt(res.prev[p])}</td></tr>`));
     box.innerHTML = (res.warnings.length ? `<ul class="warn">${res.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : '') +
-      (rows.length ? `<table class="ltable"><tr><th>項目</th><th>値</th></tr>${rows.join('')}</table><button type="button" class="sbtn primary" data-action="kv-apply">取り込む</button>` : '<p class="note-p">取り込める行がありません。</p>');
+      (rows.length ? `<table class="ltable"><tr><th>項目</th><th>値（円）</th></tr>${rows.join('')}</table><button type="button" class="sbtn primary" data-action="kv-apply">取り込む</button>` : '<p class="note-p">取り込める行がありません。</p>');
   }
   function actions(api, el) {
     return {

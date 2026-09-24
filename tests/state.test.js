@@ -1,5 +1,5 @@
 const S = Sim.state;
-test('createSample: version2・カテゴリ2件・シナリオ3本・旧値が後日追加に入る', () => {
+test('createSample: version3・カテゴリ2件・シナリオ3本・旧値が後日追加に入る', () => {
   const s = S.createSample();
   eq(s.version, 3); eq(s.categories.length, 2); eq(s.plan.scenarios.length, 3); eq(s.plan.activeScenario, 1);
   eq(s.categories[0].name, '枕（フィッティング）'); eq(s.categories[0].entryPrice, 12000); eq(s.categories[0].newCustomers, 40);

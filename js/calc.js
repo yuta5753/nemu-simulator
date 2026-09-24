@@ -101,7 +101,7 @@ window.Sim = window.Sim || {};
   }
   function effectiveCogsRate(state) {
     const m = state.mgmt;
-    if (m && m.revenue > 0 && m.costs && m.costs.cogs != null) return m.costs.cogs / m.revenue * 100;
+    if (m && m.revenue > 0 && m.costs && m.costs.cogs != null) return Math.max(0, m.costs.cogs) / m.revenue * 100;
     return state.store.cogsRate || 0;
   }
   const nz = v => (v == null || isNaN(v)) ? null : v;

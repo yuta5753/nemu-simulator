@@ -55,7 +55,7 @@ Sim.ui = Sim.ui || {};
         <div class="gbox"><label>店名</label><input type="text" data-path="store.name" value="${esc(s.name)}" placeholder="○○店"></div>
         <div class="gbox"><label>決算期（表示用）</label><input type="text" data-path="store.fiscalLabel" value="${esc(s.fiscalLabel)}" placeholder="2026年度（4月〜3月）"></div>
         <div class="gbox"><label>原価率（物販）${guide('売上に対する仕入原価の割合です。粗利＝売上×（1−原価率）で計算します。①経営数値に仕入原価と総売上が入っていれば、そちらの値を優先します。')}<span data-out="cogs-auto"></span></label><div class="row"><input type="number" min="0" max="100" step="0.1" data-type="num" data-path="store.cogsRate" value="${val(s.cogsRate)}"><span class="unit">%</span></div></div>
-        <div class="gbox"><label>固定費（任意・月額）</label><div class="row"><input type="number" min="0" step="10000" data-type="num" data-path="store.fixedCostMonthly" value="${val(s.fixedCostMonthly)}"><span class="unit">円/月</span></div></div>
+        <div class="gbox"><label>固定費（任意・月額）</label><div class="row"><input type="number" min="0" step="1" data-type="man0" data-path="store.fixedCostMonthly" value="${U().man(s.fixedCostMonthly)}"><span class="unit">万円/月</span></div></div>
       </div>
       <div class="sec-title"><span class="no">2</span><h2>間口カテゴリ</h2><span class="hint">最初に買ってもらう商品のくくりごとに入力${guide('「間口」＝新規のお客様が最初に買う商品のくくりです。レジや帳簿で「初めてのお客様が最初に買った物」を数えると出せます。人数が10人未満のカテゴリは診断を保留します。')}</span></div>
       <div class="products">${state.categories.map((c, i) => categoryCard(c, i, period)).join('')}</div>

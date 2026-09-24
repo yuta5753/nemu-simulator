@@ -19,4 +19,5 @@
   .qdot { fill-opacity: .5; }
   .report .ltable, .report .lev, .report .kpi, .report .impact, .report .tm-row { break-inside: avoid; page-break-inside: avoid; }
   .report .rpage h3 { break-after: avoid; page-break-after: avoid; }
+  .mix, .mix span, .hbar, .hbar .cur, .hbar .prev, .hbar .bench, .wf .bar-total, .wf .bar-minus, .wf .bar-profit, .wf .bar-loss { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

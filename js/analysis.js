@@ -170,6 +170,7 @@ window.Sim = window.Sim || {};
     if (h.lowContribution.length) out.push(`${h.lowContribution.join('・')}は売上シェアに比べて粗利貢献が小さく、値付けか仕入の見直し余地がある可能性があります。`);
     const lv = Sim.calc.mgmtLeverage(state); if (lv) out.push(`営業利益に最も効くのは「${lv.top.label}」で、${yen(lv.top.delta)}の増加になる試算です。`);
     consistencyCheck(state).flags.forEach(f => out.push(f + '。'));
+    if (!out.length) out.push('費用の構造や顧客の構成を入れると、ここにコメントが出ます。');
     return out;
   }
   Sim.analysis = { MIN_BASE, LEVER_LABELS, QUADRANT_LABELS, portfolio, leverage, weakness, timing, checks, comments, mgmtHealth, consistencyCheck, mgmtChecks, mgmtComments };

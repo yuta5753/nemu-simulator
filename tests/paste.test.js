@@ -60,6 +60,11 @@ test('parseKeyValues: 万円で受ける・ラベル揺れ・記号・前期プ�
 test('parseKeyValues: 「万」「万円」の単位表記を剥がしてから数値化する', () => {
   eq(P.parseKeyValues('総売上\t4800万円').values, { revenue: 48000000 });
 });
+test('parseKeyValues: 円貼り付けと万貼り付けが混在しても、万表記の行だけ×10000にする', () => {
+  const r = P.parseKeyValues('総売上\t48,000,000円\n広告宣伝費\t180万\n人件費\t¥9,600,000');
+  eq(r.values, { revenue: 48000000, 'costs.ads': 1800000, 'costs.labor': 9600000 });
+  ok(r.warnings.some(w => w.includes('円で貼られた')));
+});
 test('applyKeyValues: 値を反映し、前期があれば prev を作る', () => {
   const s = Sim.state.createEmpty(); const r = P.applyKeyValues(s, P.parseKeyValues('総売上\t100\n仕入原価\t40\n前期 総売上\t90'));
   eq(s.mgmt.revenue, null, '元は変えない'); eq(r.state.mgmt.revenue, 1000000); eq(r.state.mgmt.costs.cogs, 400000); eq(r.state.mgmt.prev.revenue, 900000); eq(r.count, 2); eq(r.prevCount, 1);
