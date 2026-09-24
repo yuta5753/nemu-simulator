@@ -12,6 +12,16 @@ Sim.ui = Sim.ui || {};
   const TACTIC_LEVERS = [['new', '新規獲得'], ['sameDay', '同日追加'], ['later', '後日追加'], ['aov', '追加単価'], ['entryPrice', '間口単価']];
   const leverLabel = k => (TACTIC_LEVERS.find(x => x[0] === k) || ['', ''])[1];
 
+  function requiredTable(r) {
+    const { yen } = U(); const pctS = v => (v == null ? '—' : (Math.round(v * 1000) / 10) + '%');
+    if (!r) return '<p class="note-p">①経営数値の「費用の構造」と、上の必要営業利益を入れると必要売上が出ます。</p>';
+    return `<table class="ltable"><tr><th>項目</th><th>金額</th><th>計算</th></tr>
+      <tr><td>必要売上</td><td><b>${yen(r.required)}</b></td><td>（固定費 ${yen(r.fixedCosts)} ＋ 必要営業利益）÷ 粗利率 ${pctS(r.grossMarginPct)}</td></tr>
+      <tr><td>現状の総売上</td><td>${yen(r.current)}</td><td></td></tr>
+      <tr><td>ギャップ</td><td class="${r.gap > 0 ? 'gap' : 'ok'}">${yen(r.gap)}</td><td>必要売上 − 現状</td></tr>
+      <tr><td>既存客の見込み売上</td><td>${yen(r.existingForecast)}</td><td>既存客売上 ×（1 ＋ 見込み％）</td></tr>
+      <tr><td>間口（新規）で稼ぐべき売上（1年）</td><td><b>${yen(r.newTarget)}</b></td><td>必要売上 − 既存客の見込み（負なら0）</td></tr></table>`;
+  }
   function reverseTable(r) {
     const { fmt, fmt1, yen } = U();
     if (!r) return '<p class="note-p">目標売上を入れると、レバーごとの必要量が出ます。</p>';
@@ -68,6 +78,13 @@ Sim.ui = Sim.ui || {};
     const si = plan.scenarios[plan.activeScenario] ? plan.activeScenario : 0; const sc = plan.scenarios[si] || plan.scenarios[0];
     sc.tactics.forEach(t => { if (t.libId) { const idx = +t.libId.split('-').pop(); const entry = Sim.tactics.LIBRARY[t.lever] && Sim.tactics.LIBRARY[t.lever][idx]; if (entry) t.text = Sim.tactics.resolve(entry, state); } });
     el.innerHTML = `
+      <div class="sec-title"><span class="no">経</span><h2>必要利益からの逆算</h2><span class="hint">${guide('「この営業利益を出すには売上がいくら必要か」を費用構造から逆算します。既存客の見込みを引いた残りが、新規（間口）で稼ぐべき売上です。「反映」を押すと下の目標売上（1年）に入ります。')}</span></div>
+      <div class="card globals">
+        <div class="gbox"><label>必要営業利益（年）</label><div class="row"><input type="number" min="0" step="10" data-type="man" data-path="plan.requiredProfit" value="${U().man(plan.requiredProfit)}"><span class="unit">万円</span></div></div>
+        <div class="gbox"><label>既存客売上の見込み（現状比）</label><div class="row"><input type="number" step="1" data-type="num" data-path="plan.existingGrowthPct" value="${val(plan.existingGrowthPct)}"><span class="unit">%</span></div></div>
+        <div class="gbox"><label>反映</label><div class="row"><button type="button" class="sbtn primary" data-action="apply-required">間口の目標売上（1年）に反映</button></div></div>
+      </div>
+      <div class="card pad" data-out="required"></div>
       <div class="sec-title"><span class="no">1</span><h2>目標設定と逆算（${U().PERIOD_LABEL(period)}で見た場合）</h2><span class="hint">${guide('期間累計の目標売上を入れると、現状とのギャップと「レバー1本だけで埋める場合の必要量」が出ます。実際は複数のレバーを組み合わせるので、下のシナリオで配分します。')}</span></div>
       <div class="card globals">
         <div class="gbox"><label>目標売上（${U().PERIOD_LABEL(period)}累計）</label><div class="row"><input type="number" min="0" step="10" data-type="man" data-path="plan.targetRevenue.${period - 1}" value="${U().man(plan.targetRevenue[period - 1])}"><span class="unit">万円</span></div></div>
@@ -96,6 +113,7 @@ Sim.ui = Sim.ui || {};
     const target = plan.targetRevenue[period - 1]; const base = Sim.calc.store(state, period); const now = Sim.calc.store(state, period, sc.levers);
     const set = (k, html) => { const n = el.querySelector(`[data-out="${k}"]`); if (n) n.innerHTML = html; };
     plan.scenarios.forEach((s2, i) => set('sc-tabname-' + i, esc(s2.name)));
+    set('required', requiredTable(Sim.calc.requiredRevenue(state)));
     set('cur-rev', yen(base.revenue));
     const reach = Sim.calc.reachRate(state, period, sc);
     set('reach-val', reach == null ? '目標未設定' : fmt1(reach) + '%（' + yen(now.revenue) + '）');
@@ -110,6 +128,8 @@ Sim.ui = Sim.ui || {};
   }
   function actions(api, el) {
     return {
+      'apply-required': () => { const r = Sim.calc.requiredRevenue(api.getState()); if (!r || r.newTarget == null) { alert('①経営数値の費用の構造と必要営業利益を入れると反映できます。'); return; }
+        api.update(s => { s.plan.targetRevenue[0] = Math.round(r.newTarget); s.store.period = 1; }, { structural: true }); },
       'sc-select': d => api.update(s => { s.plan.activeScenario = +d.index; }, { structural: true }),
       'sc-add': () => api.update(s => { if (s.plan.scenarios.length >= 3) return; s.plan.scenarios.push(Sim.state.newScenario('シナリオ' + (s.plan.scenarios.length + 1), s.categories)); s.plan.activeScenario = s.plan.scenarios.length - 1; }, { structural: true }),
       'sc-copy': () => { if (api.getState().plan.scenarios.length >= 3) { alert('シナリオは3本までです。'); return; }
@@ -136,5 +156,5 @@ Sim.ui = Sim.ui || {};
         if (navigator.clipboard) navigator.clipboard.writeText(rows).then(() => alert('コピーしました'), () => alert('コピーできませんでした。表を選択して手動でコピーしてください。')); else alert('この環境ではコピーできません。表を選択して手動でコピーしてください。'); }
     };
   }
-  Sim.ui.plan = { render, refresh: outputs, parts: { reverseTable, comparison, LEVERS, TACTIC_LEVERS } };
+  Sim.ui.plan = { render, refresh: outputs, parts: { reverseTable, requiredTable, comparison, LEVERS, TACTIC_LEVERS } };
 })();
