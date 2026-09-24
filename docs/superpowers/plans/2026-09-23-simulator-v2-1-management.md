@@ -21,6 +21,7 @@
 - 入力が欠けている計算結果は `null`（0で誤診断しない）。画面は「—」
 - 5ステップ：①経営数値 ②間口カテゴリ ③診断 ④目標と戦略 ⑤レポート。レポートのパネルは `#panel-5`
 - 文体は「ですます調」、押しつけ表現なし。用語は「間口カテゴリ」
+- **表示単位（仕様§12）**：金額の表示は `Sim.ui.util.yen()` に統一（1万円未満＝円、以上＝万円、1億以上＝億円、小数1桁）。経営数値・目標・費用の入力は万円（`data-type="man"`／既定0の欄は `"man0"`）、初回→追加購入は ヶ月入力（`data-type="months"`）。内部データは円・日のまま。間口の期間軸の表記は「12ヶ月／24ヶ月／36ヶ月」
 - 計画LTV・逆算など v2 の計算は変更しない。**変更点は1つだけ**：`store()` の原価率は経営数値（仕入原価÷総売上）があればそれを優先する。固定費（月額）は間口分析には流さない（仕様§3の「固定費も上書き」は採用しない — 間口コホートの売上から店全体の固定費を引くと誤った営業利益が出るため）
 
 ## Review Focus
@@ -37,6 +38,7 @@
 
 | ファイル | 変更 | 責務 | Task |
 |---|---|---|---|
+| `js/ui-util.js` / `index.html` / `js/ui-input.js` / `js/ui-diagnosis.js` / `js/ui-plan.js` / `js/ui-report.js` | 修正 | 表示単位（万円・ヶ月・12ヶ月表記） | 0 |
 | `js/state.js` | 修正 | `mgmt` 構造・version 3・benchmarks 拡張・サンプル値 | 1 |
 | `js/calc.js` | 修正 | `effectiveCogsRate / mgmt / consistency / mgmtLeverage / requiredRevenue` | 2 |
 | `js/analysis.js` | 修正 | `mgmtHealth / consistencyCheck / mgmtChecks / mgmtComments` | 3 |
@@ -49,6 +51,99 @@
 | `js/ui-report.js` | 修正 | 2ページ追加・必要利益の表 | 8 |
 | `README.md` / `tests/manual-checklist.md` | 修正 | 5ステップの記述 | 9 |
 | `tests/*.test.js` | 修正 | 各Taskのテスト | 各Task |
+
+---
+
+### Task 0: 表示単位（万円・ヶ月・12ヶ月表記）
+
+v2 の既存画面に対する変更。経営数値より先に入れておくと、以降の Task が同じ書式関数を使える。
+
+**Files:**
+- Modify: `js/ui-util.js`
+- Modify: `tests/ui-util.test.js`
+- Modify: `index.html`（期間ボタンの文言）
+- Modify: `js/ui-input.js`, `js/ui-diagnosis.js`, `js/ui-plan.js`, `js/ui-report.js`（表記）
+
+**Interfaces:**
+- Produces:
+  - `Sim.ui.util.yen(n)` → `'6,000円'`（1万円未満）／`'12.5万円'`・`'480万円'`（端数なしは小数を出さない）／`'4.8億円'`（1億以上）／負は先頭に `'−'`／null は `'—'`
+  - `Sim.ui.util.man(n)` → 入力欄用：円→万円（小数1桁、null は `''`）、`Sim.ui.util.months(d)` → 日→ヶ月（小数1桁、null は `''`）
+  - `parseValue`: `data-type="man"` → 万円入力×10000（空は null）、`"man0"` → 同（空は 0）、`"months"` → ヶ月×30（空は null）
+  - `Sim.ui.util.PERIOD_LABEL(period)` → `'12ヶ月'|'24ヶ月'|'36ヶ月'`
+
+- [ ] **Step 1: テストを修正・追加**
+
+`tests/ui-util.test.js` の `fmt/yen/signed/esc` テストの `eq(U.yen(1000), '¥1,000'); eq(U.yen(null), '—');` を次に置き換え:
+```js
+  eq(U.yen(1000), '1,000円'); eq(U.yen(null), '—'); eq(U.yen(12000), '1.2万円'); eq(U.yen(4800000), '480万円'); eq(U.yen(35120), '3.5万円');
+  eq(U.yen(480000000), '4.8億円'); eq(U.yen(-35000), '−3.5万円'); eq(U.yen(0), '0円');
+  eq(U.man(48000000), 4800); eq(U.man(35120), 3.5); eq(U.man(null), ''); eq(U.months(45), 1.5); eq(U.months(null), ''); eq(U.PERIOD_LABEL(2), '24ヶ月');
+```
+`parseValue` テストに追記:
+```js
+  eq(U.parseValue(el('man', '4800')), 48000000); eq(U.parseValue(el('man', '')), null); eq(U.parseValue(el('man0', '')), 0); eq(U.parseValue(el('man', '1.5')), 15000);
+  eq(U.parseValue(el('months', '1.5')), 45); eq(U.parseValue(el('months', '')), null);
+```
+
+- [ ] **Step 2: 失敗を確認**
+
+Run: `node tests/run.js`
+Expected: ui-util の2件が ✗
+
+- [ ] **Step 3: ui-util.js を修正**
+
+`parseValue` に3行追加（`if (t === 'bool')` の前）:
+```js
+    if (t === 'man') { if (v === '' || v == null) return null; const n = +v; return isNaN(n) ? null : Math.round(n * 10000); }
+    if (t === 'man0') { const n = +v; return (v === '' || isNaN(n)) ? 0 : Math.round(n * 10000); }
+    if (t === 'months') { if (v === '' || v == null) return null; const n = +v; return isNaN(n) ? null : Math.round(n * 30); }
+```
+`yen` の定義を置き換え、`man` `months` `PERIOD_LABEL` を追加:
+```js
+  const trim1 = v => (Math.round(v * 10) / 10).toLocaleString('ja-JP', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+  const yen = n => {
+    if (n == null || isNaN(n)) return '—'; const a = Math.abs(n); const sign = n < 0 ? '−' : '';
+    if (a < 10000) return sign + Math.round(a).toLocaleString('ja-JP') + '円';
+    if (a >= 100000000) return sign + trim1(a / 100000000) + '億円';
+    return sign + trim1(a / 10000) + '万円';
+  };
+  const man = n => (n == null || isNaN(n)) ? '' : Math.round(n / 10000 * 10) / 10;
+  const months = d => (d == null || isNaN(d)) ? '' : Math.round(d / 30 * 10) / 10;
+  const PERIOD_LABEL = p => (p * 12) + 'ヶ月';
+```
+export に `man, months, PERIOD_LABEL` を追加:
+```js
+  Sim.ui.util = { getPath, setPath, parseValue, bindPanel, esc, fmt, fmt1, yen, man, months, PERIOD_LABEL, signed, val, guide };
+```
+
+- [ ] **Step 4: 期間の表記を月に**
+
+- `index.html`: `1年で見る／2年で見る／3年で見る` → `12ヶ月で見る／24ヶ月で見る／36ヶ月で見る`、フローティングの `1年／2年／3年` → `12ヶ月／24ヶ月／36ヶ月`
+- `js/ui-input.js`: `const PER = ['1年で', '2年で', '3年で'];` → `const PER = ['12ヶ月', '24ヶ月', '36ヶ月'];`。ガイド文の「1年→2年→3年と累計」→「12→24→36ヶ月と累計」。目安値の見出し `（${PER[y]}）` はそのまま（PERが変わるので追随）。`後日追加ぶん（${period}年累計）` → `後日追加ぶん（${U().PERIOD_LABEL(period)}累計）`、`顧客あたりLTV（${period}年）` → `顧客あたりLTV（${U().PERIOD_LABEL(period)}）`
+- `js/ui-input.js` の「初回→追加購入までの日数」欄を置き換え:
+```js
+            <div class="field"><span class="flabel">初回→追加購入までの期間<span class="q">最初の後日追加までの平均（ヶ月・小数可）</span></span><input class="inp" type="number" min="0" step="0.1" data-type="months" data-path="categories.${i}.daysToAddon" value="${U().months(c.daysToAddon)}"></div>
+```
+  前期の同欄も `data-type="months"` と `value="${U().months(p.daysToAddon)}"`、ラベル「前期 初回→追加購入（ヶ月）」。目安値の `benchmarks.daysToAddon` も同様に `data-type="months"`・ラベル「初回→追加購入の目安（ヶ月）」
+- `js/ui-diagnosis.js`: `${period}年で見た場合` → `${U().PERIOD_LABEL(period)}で見た場合`、`${st.period}年で見た累計` → `${U().PERIOD_LABEL(st.period)}累計`。`timingBlock` の `${t.days}日` → `${t.days}日（約${U().months(t.days)}ヶ月）`
+- `js/ui-plan.js`: `（${period}年で見た場合）` `（${period}年累計）` → `PERIOD_LABEL(period)` を使う（3か所）。目標売上の入力を万円に: `data-type="optnum"` → `data-type="man"`、`value="${val(plan.targetRevenue[period - 1])}"` → `value="${U().man(plan.targetRevenue[period - 1])}"`、`step="100000"` → `step="10"`、単位 `円` → `万円`
+- `js/ui-report.js`: `${period}年で見た場合` の2か所を `PERIOD_LABEL(period)` に。前提の文「1年／2年／3年」→「12／24／36ヶ月」
+- `js/analysis.js`: `timing()` の警告文 `平均日数（${d}日）が選択期間（${limit}日）` はそのまま（日数表記で可）
+- `js/ui-input.js` `outputs()` の `'¥' + fmt(...)` のような `¥` 直書きが残っていれば `yen()` に置き換える
+
+- [ ] **Step 5: テスト・構文・ブラウザ確認**
+
+Run: `node --check js/*.js && node tests/run.js`
+Expected: 構文OK、`60 passed, 0 failed`（58＋修正した2件は件数不変。追加テストは既存テスト内に追記）
+
+ブラウザ（コントローラーが実施）：期間ボタンが「12ヶ月で見る…」／枕のLTVが「3.5万円」／KPI売上「237.7万円」／間口単価「1.2万円」「6,000円」／初回→追加購入欄が「1.5」（ヶ月）で、③の打ち時が「45日（約1.5ヶ月）」／④の目標売上を「280」（万円）と入れるとギャップ「42.3万円」
+
+- [ ] **Step 6: コミット**
+
+```bash
+git add js/ui-util.js tests/ui-util.test.js index.html js/ui-input.js js/ui-diagnosis.js js/ui-plan.js js/ui-report.js
+git commit -m "feat(v2.1): 表示単位を万円・ヶ月・12ヶ月表記に統一"
+```
 
 ---
 
@@ -515,24 +610,27 @@ git commit -m "feat(v2.1): analysis に経営の健康度・整合チェック�
 **Interfaces:**
 - Produces:
   - `Sim.paste.KV_LABELS`（state パス → 認識ラベル配列）
-  - `Sim.paste.parseKeyValues(text)` → `{ values:{[path]:number}, prev:{[path]:number}, warnings:[string] }`（path は `mgmt` からの相対、例 `costs.labor`）
+  - `Sim.paste.parseKeyValues(text)` → `{ values:{[path]:number}, prev:{[path]:number}, warnings:[string] }`（path は `mgmt` からの相対、例 `costs.labor`）。**金額の項目は万円で受け取り円に変換**する。ただし金額の値に 1,000,000 以上が1つでもあれば全体を円とみなし、警告「金額が大きいため、円で貼られたものとして取り込みました」を足す
+  - `Sim.paste.AMOUNT_KEYS`（万円→円変換の対象パス）
   - `Sim.paste.applyKeyValues(state, parsed)` → `{ state（深いコピー）, count, prevCount }`
 
 - [ ] **Step 1: テストを追加**
 
 `tests/paste.test.js` の末尾に追記:
 ```js
-test('parseKeyValues: ラベル揺れ・記号・前期プレフィックス・未知行', () => {
-  const r = P.parseKeyValues('総売上\t¥48,000,000\n購入客数,700\n広告費\t1,800,000\n期末在庫金額　6000000\n来店3回以上\t150\n前期 総売上\t40000000\n前期　人件費\t9,000,000\n謎の項目\t1\n人件費\tabc');
+test('parseKeyValues: 万円で受ける・ラベル揺れ・記号・前期プレフィックス・未知行', () => {
+  const r = P.parseKeyValues('総売上\t¥4,800\n購入客数,700\n広告費\t180\n期末在庫金額　600\n来店3回以上\t150\n前期 総売上\t4000\n前期　人件費\t900\n謎の項目\t1\n人件費\tabc');
   eq(r.values, { revenue: 48000000, buyers: 700, 'costs.ads': 1800000, inventory: 6000000, 'visits.threePlus': 150 });
   eq(r.prev, { revenue: 40000000, 'costs.labor': 9000000 });
   eq(r.warnings.length, 2); ok(r.warnings[0].includes('謎の項目')); ok(r.warnings[1].includes('人件費'));
+  const y = P.parseKeyValues('総売上\t48,000,000\n人件費\t9,600,000\n購入客数\t700'); eq(y.values, { revenue: 48000000, 'costs.labor': 9600000, buyers: 700 }); ok(y.warnings.some(w => w.includes('円で貼られた')));
+  eq(P.parseKeyValues('買上点数\t1.6').values, { itemsPerBuyer: 1.6 }, '人数・点数は変換しない');
   eq(P.parseKeyValues('').values, {});
   const e = P.parseKeyValues('前期 総売上\t\n家賃\t'); eq(e.values, {}); eq(e.prev, {}); eq(e.warnings, [], '値が空の行は警告なしで飛ばす');
 });
 test('applyKeyValues: 値を反映し、前期があれば prev を作る', () => {
   const s = Sim.state.createEmpty(); const r = P.applyKeyValues(s, P.parseKeyValues('総売上\t100\n仕入原価\t40\n前期 総売上\t90'));
-  eq(s.mgmt.revenue, null, '元は変えない'); eq(r.state.mgmt.revenue, 100); eq(r.state.mgmt.costs.cogs, 40); eq(r.state.mgmt.prev.revenue, 90); eq(r.count, 2); eq(r.prevCount, 1);
+  eq(s.mgmt.revenue, null, '元は変えない'); eq(r.state.mgmt.revenue, 1000000); eq(r.state.mgmt.costs.cogs, 400000); eq(r.state.mgmt.prev.revenue, 900000); eq(r.count, 2); eq(r.prevCount, 1);
   const r2 = P.applyKeyValues(s, P.parseKeyValues('総売上\t100')); eq(r2.state.mgmt.prev, null);
 });
 ```
@@ -552,6 +650,7 @@ Expected: 新規2件が ✗
     dormant: ['休眠客数'], inventory: ['期末在庫', '期末在庫金額', '在庫金額'], 'costs.cogs': ['仕入原価', '売上原価'], 'costs.labor': ['人件費'], 'costs.rent': ['家賃', '地代家賃'],
     'costs.ads': ['広告宣伝費', '広告費'], 'costs.other': ['その他経費', 'その他'], 'funnel.reservations': ['予約数'], 'funnel.visits': ['来店数'], 'funnel.deals': ['成約数']
   };
+  const AMOUNT_KEYS = ['revenue', 'newRevenue', 'inventory', 'costs.cogs', 'costs.labor', 'costs.rent', 'costs.ads', 'costs.other'];
   const normLabel = s => String(s == null ? '' : s).replace(/[\s　"]/g, '').replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
   function parseKeyValues(text) {
     const values = {}, prev = {}, warnings = [];
@@ -568,6 +667,10 @@ Expected: 新規2件が ✗
       if (v == null) { warnings.push(`${li + 1}行目：「${m[1].trim()}」の値が数字ではありません`); return; }
       (isPrev ? prev : values)[path] = v;
     });
+    // 金額は万円で受ける。1,000,000以上の金額があれば円で貼られたとみなす
+    const amounts = [].concat(Object.keys(values).filter(k => AMOUNT_KEYS.includes(k)).map(k => values[k]), Object.keys(prev).filter(k => AMOUNT_KEYS.includes(k)).map(k => prev[k]));
+    if (amounts.some(v => v >= 1000000)) { if (amounts.length) warnings.push('金額が大きいため、円で貼られたものとして取り込みました（万円で貼ると小数も使えます）'); }
+    else { [values, prev].forEach(o => Object.keys(o).forEach(k => { if (AMOUNT_KEYS.includes(k)) o[k] = Math.round(o[k] * 10000); })); }
     return { values, prev, warnings };
   }
   function setDeep(obj, path, value) { const keys = path.split('.'); let o = obj; for (let i = 0; i < keys.length - 1; i++) { if (o[keys[i]] == null) o[keys[i]] = {}; o = o[keys[i]]; } o[keys[keys.length - 1]] = value; }
@@ -578,7 +681,7 @@ Expected: 新規2件が ✗
     if (prevKeys.length) { if (!s.mgmt.prev) s.mgmt.prev = Sim.state.normalizeMgmt({}, false); prevKeys.forEach(p => setDeep(s.mgmt.prev, p, parsed.prev[p])); }
     return { state: s, count: Object.keys(parsed.values).length, prevCount: prevKeys.length };
   }
-  Sim.paste = { HEADERS, toNum, mapHeaders, parse, apply, KV_LABELS, parseKeyValues, applyKeyValues };
+  Sim.paste = { HEADERS, toNum, mapHeaders, parse, apply, KV_LABELS, AMOUNT_KEYS, parseKeyValues, applyKeyValues };
 ```
 
 - [ ] **Step 4: 全テストが通ることを確認**
@@ -698,18 +801,18 @@ Sim.ui = Sim.ui || {};
   const U = () => Sim.ui.util;
   let pendingKv = null;
   function nf(labelHtml, path, value, opts) {
-    const { val } = U(); opts = opts || {};
-    return `<div class="field"><span class="flabel">${labelHtml}</span><input class="inp" type="number" min="0"${opts.max != null ? ` max="${opts.max}"` : ''}${opts.step ? ` step="${opts.step}"` : ''} data-type="optnum" data-path="${path}" value="${val(value)}"></div>`;
+    const { val, man } = U(); opts = opts || {}; const isMan = !!opts.man;
+    return `<div class="field"><span class="flabel">${labelHtml}</span><input class="inp" type="number" min="0"${opts.max != null ? ` max="${opts.max}"` : ''}${opts.step ? ` step="${opts.step}"` : (isMan ? ' step="0.1"' : '')} data-type="${isMan ? 'man' : 'optnum'}" data-path="${path}" value="${isMan ? man(value) : val(value)}"></div>`;
   }
   function numericBlocks(prefix, m, tag) {
     const g = p => `${prefix}.${p}`; const { guide } = U(); const t = tag || '';
     return `
       <div class="sec-title"><span class="no">1</span><h2>売上の全体像${t}</h2><span class="hint">年次（直近の決算期）${guide('レジの年間集計や決算書から。「新規客数」「新規客売上」は顧客IDで初回購入を判定できることが前提です。無ければ新規会員登録数で代用してください。')}</span></div>
       <div class="card pad"><div class="basebox mg4">
-        ${nf('総売上（年）<span class="q">円。税込／税抜は店内で統一</span>', g('revenue'), m.revenue)}
+        ${nf('総売上（年）<span class="q">万円。税込／税抜は店内で統一</span>', g('revenue'), m.revenue, { man: true })}
         ${nf('購入客数（延べ）<span class="q">人</span>', g('buyers'), m.buyers)}
         ${nf('新規客数<span class="q">人</span>', g('newBuyers'), m.newBuyers)}
-        ${nf('新規客売上<span class="q">円</span>', g('newRevenue'), m.newRevenue)}
+        ${nf('新規客売上<span class="q">万円</span>', g('newRevenue'), m.newRevenue, { man: true })}
         ${nf('買上点数（任意）<span class="q">1人あたり</span>', g('itemsPerBuyer'), m.itemsPerBuyer, { step: '0.1' })}
       </div><div class="autovals" data-out="${prefix}-auto-sales"></div></div>
       <div class="sec-title"><span class="no">2</span><h2>顧客の構成${t}</h2><span class="hint">${guide('アクティブ顧客＝過去2年以内に購入した人。来店回数別はその内訳です（合計がアクティブ顧客数と一致するのが理想）。')}</span></div>
@@ -722,12 +825,12 @@ Sim.ui = Sim.ui || {};
       </div><div class="autovals" data-out="${prefix}-auto-cust"></div></div>
       <div class="sec-title"><span class="no">3</span><h2>費用の構造${t}</h2><span class="hint">年額${guide('決算書・試算表から。粗利率＝（売上−仕入原価）÷売上、損益分岐点売上＝固定費÷粗利率で計算します。')}</span></div>
       <div class="card pad"><div class="basebox mg4">
-        ${nf('仕入原価<span class="q">円</span>', g('costs.cogs'), m.costs.cogs)}
-        ${nf('人件費<span class="q">円</span>', g('costs.labor'), m.costs.labor)}
-        ${nf('家賃<span class="q">円</span>', g('costs.rent'), m.costs.rent)}
-        ${nf('広告宣伝費<span class="q">円</span>', g('costs.ads'), m.costs.ads)}
-        ${nf('その他経費<span class="q">円</span>', g('costs.other'), m.costs.other)}
-        ${nf('期末在庫金額（任意）<span class="q">円</span>', g('inventory'), m.inventory)}
+        ${nf('仕入原価<span class="q">万円</span>', g('costs.cogs'), m.costs.cogs, { man: true })}
+        ${nf('人件費<span class="q">万円</span>', g('costs.labor'), m.costs.labor, { man: true })}
+        ${nf('家賃<span class="q">万円</span>', g('costs.rent'), m.costs.rent, { man: true })}
+        ${nf('広告宣伝費<span class="q">万円</span>', g('costs.ads'), m.costs.ads, { man: true })}
+        ${nf('その他経費<span class="q">万円</span>', g('costs.other'), m.costs.other, { man: true })}
+        ${nf('期末在庫金額（任意）<span class="q">万円</span>', g('inventory'), m.inventory, { man: true })}
       </div><div class="autovals" data-out="${prefix}-auto-cost"></div></div>
       <div class="sec-title"><span class="no">4</span><h2>集客効率${t}</h2><span class="hint">任意</span></div>
       <div class="card pad"><div class="basebox mg4">
@@ -737,10 +840,10 @@ Sim.ui = Sim.ui || {};
       </div><div class="autovals" data-out="${prefix}-auto-funnel"></div></div>`;
   }
   function productsBlock(m) {
-    const { esc, val, guide } = U();
+    const { esc, val, man, guide } = U();
     return `<div class="sec-title"><span class="no">5</span><h2>商品・粗利</h2><span class="hint">カテゴリ別の売上と粗利率${guide('売上の内訳と粗利率をカテゴリごとに。②の間口カテゴリ名を取り込んでから、足りない行を追加できます。')}</span></div>
-      <div class="card pad"><table class="ltable"><tr><th>カテゴリ</th><th>売上（年・円）</th><th>粗利率（%）</th><th>売上シェア</th><th>粗利貢献</th><th></th></tr>
-        ${m.products.map((p, i) => `<tr><td><input type="text" data-path="mgmt.products.${i}.name" value="${esc(p.name)}" placeholder="カテゴリ名"></td><td><input type="number" min="0" data-type="optnum" data-path="mgmt.products.${i}.sales" value="${val(p.sales)}"></td><td><input type="number" min="0" max="100" data-type="optnum" data-path="mgmt.products.${i}.grossMarginPct" value="${val(p.grossMarginPct)}"></td><td data-out="mg-prod-share-${p.id}"></td><td data-out="mg-prod-contrib-${p.id}"></td><td><button type="button" class="del dark" data-action="mg-del-product" data-index="${i}">✕</button></td></tr>`).join('')}
+      <div class="card pad"><table class="ltable"><tr><th>カテゴリ</th><th>売上（年・万円）</th><th>粗利率（%）</th><th>売上シェア</th><th>粗利貢献</th><th></th></tr>
+        ${m.products.map((p, i) => `<tr><td><input type="text" data-path="mgmt.products.${i}.name" value="${esc(p.name)}" placeholder="カテゴリ名"></td><td><input type="number" min="0" step="0.1" data-type="man" data-path="mgmt.products.${i}.sales" value="${man(p.sales)}"></td><td><input type="number" min="0" max="100" data-type="optnum" data-path="mgmt.products.${i}.grossMarginPct" value="${val(p.grossMarginPct)}"></td><td data-out="mg-prod-share-${p.id}"></td><td data-out="mg-prod-contrib-${p.id}"></td><td><button type="button" class="del dark" data-action="mg-del-product" data-index="${i}">✕</button></td></tr>`).join('')}
       </table>
       <button type="button" class="sbtn" data-action="mg-import-categories">②の間口カテゴリ名を取り込む</button><button type="button" class="sbtn" data-action="mg-add-product">＋ 行を追加</button>
       <div class="autovals" data-out="mg-auto-inv"></div></div>`;
@@ -753,10 +856,10 @@ Sim.ui = Sim.ui || {};
       </table><button type="button" class="sbtn" data-action="mg-add-rep">＋ 行を追加</button></div>`;
   }
   function channelsBlock(state) {
-    const { esc, val } = U();
+    const { esc, val, man } = U();
     return `<div class="card pad" style="margin-top:14px"><h3 class="h3">集客経路（任意）— 経路ごとの新規人数と費用からCPAを出します</h3>
-      <table class="ltable"><tr><th>経路名</th><th>新規人数</th><th>費用（円・年）</th><th>CPA</th><th></th></tr>
-        ${state.channels.map((ch, i) => `<tr><td><input type="text" data-path="channels.${i}.name" value="${esc(ch.name)}"></td><td><input type="number" min="0" data-type="num" data-path="channels.${i}.newCustomers" value="${val(ch.newCustomers)}"></td><td><input type="number" min="0" data-type="num" data-path="channels.${i}.cost" value="${val(ch.cost)}"></td><td data-out="cpa-${ch.id}"></td><td><button type="button" class="del dark" data-action="del-channel" data-index="${i}">✕</button></td></tr>`).join('')}
+      <table class="ltable"><tr><th>経路名</th><th>新規人数</th><th>費用（万円・年）</th><th>CPA</th><th></th></tr>
+        ${state.channels.map((ch, i) => `<tr><td><input type="text" data-path="channels.${i}.name" value="${esc(ch.name)}"></td><td><input type="number" min="0" data-type="num" data-path="channels.${i}.newCustomers" value="${val(ch.newCustomers)}"></td><td><input type="number" min="0" step="0.1" data-type="man0" data-path="channels.${i}.cost" value="${man(ch.cost)}"></td><td data-out="cpa-${ch.id}"></td><td><button type="button" class="del dark" data-action="del-channel" data-index="${i}">✕</button></td></tr>`).join('')}
       </table><button type="button" class="sbtn" data-action="add-channel">＋ 経路を追加</button>
       <p class="note-p">経路の新規合計と間口カテゴリの新規合計は一致しなくて構いません。</p></div>`;
   }
@@ -780,8 +883,8 @@ Sim.ui = Sim.ui || {};
         ${nf('リピート率の目安 %', 'benchmarks.repeatRate', b.repeatRate, { max: 100 })}
       </div></details>
       <details class="card optblock"><summary>貼り付け（項目名と値の2列）— 収集シートの「経営数値」をそのまま貼れます</summary><div class="optbody">
-        <p class="note-p">1行に「項目名 TAB 値」。項目名：総売上／購入客数／新規客数／新規客売上／買上点数／アクティブ顧客数／来店1回／来店2回／来店3回以上／休眠客数／期末在庫／仕入原価／人件費／家賃／広告宣伝費／その他経費／予約数／来店数／成約数。先頭に「前期 」を付けると前期の欄に入ります。カテゴリ別の売上・粗利率と買替は表に直接入力してください。</p>
-        <textarea id="kv-text" rows="6" placeholder="総売上	48000000&#10;仕入原価	24000000"></textarea>
+        <p class="note-p">1行に「項目名 TAB 値」。金額は<b>万円</b>で（円で貼っても自動で判定します）。項目名：総売上／購入客数／新規客数／新規客売上／買上点数／アクティブ顧客数／来店1回／来店2回／来店3回以上／休眠客数／期末在庫／仕入原価／人件費／家賃／広告宣伝費／その他経費／予約数／来店数／成約数。先頭に「前期 」を付けると前期の欄に入ります。カテゴリ別の売上・粗利率と買替は表に直接入力してください。</p>
+        <textarea id="kv-text" rows="6" placeholder="総売上	4800&#10;仕入原価	2400"></textarea>
         <button type="button" class="sbtn" data-action="kv-preview">プレビュー</button><div id="kv-preview"></div>
       </div></details>`;
     outputs(el, state); U().bindPanel(el, api, actions(api, el));
@@ -860,13 +963,13 @@ Expected: 全ファイル構文OK、`78 passed, 0 failed`
 
 | 確認 | 期待 |
 |---|---|
-| 起動（サンプル） | ステッパーが5つ。①に経営数値の6ブロック＋前期・目安値・貼り付けの折りたたみ。自動値：既存客売上 ¥47,100,000／客単価 ¥68,571／リピート率 44.4%／粗利率 50%／営業利益 ¥4,800,000／損益分岐点 ¥38,400,000／安全余裕率 20%／在庫回転 3ヶ月／予約→来店 80% |
-| 新規客売上に 60000000 | 黄色の注記「新規客売上が総売上を超えています」。フォーカス維持 |
+| 起動（サンプル） | ステッパーが5つ。①に経営数値の6ブロック＋前期・目安値・貼り付けの折りたたみ。自動値：既存客売上 4,710万円／客単価 6.9万円／リピート率 44.4%／粗利率 50%／営業利益 480万円／損益分岐点 3,840万円／安全余裕率 20%／在庫回転 3ヶ月／予約→来店 80%。入力欄は万円（総売上 4800） |
+| 新規客売上に 6000（万円） | 黄色の注記「新規客売上が総売上を超えています」。フォーカス維持 |
 | 「②の間口カテゴリ名を取り込む」 | 既にある2件は増えない（名前一致） |
-| 前期の欄を追加→総売上 40000000 | 前期側の自動値が出る |
-| 貼り付けに `総売上\t50000000\n前期 総売上\t45000000` → プレビュー → 取り込む | 「今期1件・前期1件」、欄が更新 |
+| 前期の欄を追加→総売上 4000 | 前期側の自動値が出る |
+| 貼り付けに `総売上\t5000\n前期 総売上\t4500` → プレビュー → 取り込む | 「今期1件・前期1件」、欄が 5000／4500（万円）に更新 |
 | ② | 集客経路ブロックが無い。原価率の横に「経営数値から自動：50%」 |
-| 仕入原価を 19200000 に→② | タグが 40%。③のKPI粗利が 40% ベース |
+| 仕入原価を 1920 に→② | タグが 40%。③のKPI粗利が 40% ベース |
 | 幅400px | 横スクロールなし |
 
 - [ ] **Step 9: コミット**
@@ -1007,14 +1110,14 @@ Expected: 構文OK、`78 passed, 0 failed`
 
 | 確認 | 期待 |
 |---|---|
-| ③（サンプル） | 先頭に「経」バッジの9ブロック。KPI：総売上 ¥48,000,000／粗利率 50%／営業利益率 10%／損益分岐点 ¥38,400,000／安全余裕率 20% |
+| ③（サンプル） | 先頭に「経」バッジの9ブロック。KPI：総売上 4,800万円／粗利率 50%／営業利益率 10%／損益分岐点 3,840万円／安全余裕率 20% |
 | 滝図 | 売上→仕入原価→粗利→人件費→家賃→広告費→その他→営業利益（緑）の8本 |
 | 費用比率 | 人件費率 20%・家賃 7.5%・広告 3.8%・その他 8.8% の横棒 |
 | 顧客の構成 | 新規1.9%／既存98.1% の帯、来店回数の3本、リピート率 44.4% |
 | 商品・粗利 | マットレスに「粗利貢献が小さい」タグ。在庫回転 3ヶ月分 |
-| 整合チェック | 新規人数 100人／100人（100%）、初回来店売上 ¥840,000／¥900,000（93.3%）。注記なし |
+| 整合チェック | 新規人数 100人／100人（100%）、初回来店売上 84万円／90万円（93.3%）。注記なし |
 | ①で新規客数を200に→③ | 整合チェックに注記 |
-| 効きどころ | 「売上 +10%」+¥2,400,000 が枠付き |
+| 効きどころ | 「売上 +10%」+240万円 が枠付き |
 | ①を「空で始める」→③ | 先頭が案内文1行、以降は間口診断（空） |
 
 - [ ] **Step 6: コミット**
@@ -1057,7 +1160,7 @@ git commit -m "feat(v2.1): ③診断に経営の健康度（滝図・費用比�
 ```js
       <div class="sec-title"><span class="no">経</span><h2>必要利益からの逆算</h2><span class="hint">${guide('「この営業利益を出すには売上がいくら必要か」を費用構造から逆算します。既存客の見込みを引いた残りが、新規（間口）で稼ぐべき売上です。「反映」を押すと下の目標売上（1年）に入ります。')}</span></div>
       <div class="card globals">
-        <div class="gbox"><label>必要営業利益（年）</label><div class="row"><input type="number" min="0" step="100000" data-type="optnum" data-path="plan.requiredProfit" value="${val(plan.requiredProfit)}"><span class="unit">円</span></div></div>
+        <div class="gbox"><label>必要営業利益（年）</label><div class="row"><input type="number" min="0" step="10" data-type="man" data-path="plan.requiredProfit" value="${U().man(plan.requiredProfit)}"><span class="unit">万円</span></div></div>
         <div class="gbox"><label>既存客売上の見込み（現状比）</label><div class="row"><input type="number" step="1" data-type="num" data-path="plan.existingGrowthPct" value="${val(plan.existingGrowthPct)}"><span class="unit">%</span></div></div>
         <div class="gbox"><label>反映</label><div class="row"><button type="button" class="sbtn primary" data-action="apply-required">間口の目標売上（1年）に反映</button></div></div>
       </div>
@@ -1090,9 +1193,9 @@ Expected: 構文OK、`78 passed, 0 failed`
 | 確認 | 期待 |
 |---|---|
 | ④（サンプル） | 先頭に「必要利益からの逆算」。必要営業利益が空なら案内文 |
-| 必要営業利益 6000000 | 必要売上 ¥50,400,000／ギャップ ¥2,400,000／既存見込み ¥47,100,000／間口で稼ぐべき ¥3,300,000 |
+| 必要営業利益 600（万円） | 必要売上 5,040万円／ギャップ 240万円／既存見込み 4,710万円／間口で稼ぐべき 330万円 |
 | 見込み 10% | 間口で稼ぐべき ¥0 |
-| 見込み 0 →「反映」 | 期間が1年に切り替わり、目標売上（1年累計）が 3,300,000。逆算表が1年ベースで出る |
+| 見込み 0 →「反映」 | 期間が12ヶ月に切り替わり、目標売上（12ヶ月累計）が 330（万円）。逆算表が12ヶ月ベースで出る |
 
 - [ ] **Step 6: コミット**
 
@@ -1182,7 +1285,7 @@ git commit -m "feat(v2.1): ⑤レポートに経営数値サマリーと経営�
 
 ```markdown
 ## 使い方
-1. **① 経営数値** — 店全体の年次の数字（総売上・客数・新規・費用の構造・カテゴリ別の売上と粗利率・集客経路など）を入れます。すべて任意で、揃うほど診断が濃くなります。収集シートの「経営数値」は2列貼り付けで取り込めます。
+1. **① 経営数値** — 店全体の年次の数字（総売上・客数・新規・費用の構造・カテゴリ別の売上と粗利率・集客経路など）を万円で入れます。すべて任意で、揃うほど診断が濃くなります。収集シートの「経営数値」は2列貼り付けで取り込めます。
 2. **② 間口カテゴリ** — 間口カテゴリごとに「間口単価・新規獲得人数・後日追加（1/2/3年）」を入れます。CRMやExcelの表は「貼り付け」から取り込めます。
 3. **③ 診断** — 経営の健康度（収益構造・費用比率・顧客構成・粗利貢献・①②の整合・効きどころ）と、間口の診断（4象限・効きどころ・弱点・打ち時）が自動で出ます。
 4. **④ 目標と戦略** — 必要営業利益から必要売上を逆算して間口の目標に反映できます。シナリオ（最大3本）でレバーを配分し、打ち手を選びます。
@@ -1198,7 +1301,7 @@ git commit -m "feat(v2.1): ⑤レポートに経営数値サマリーと経営�
 先頭の「起動・保存」の後に節を追加し、既存の「① 現状入力」→「② 間口カテゴリ」、「② 診断」→「③ 診断」、「③ 目標と戦略」→「④ 目標と戦略」、「④ レポート」→「⑤ レポート」に番号を振り直す。追加節:
 ```markdown
 ## ① 経営数値
-- [ ] サンプルで自動値が出る（既存客売上 ¥47,100,000／客単価 ¥68,571／リピート率 44.4%／粗利率 50%／営業利益 ¥4,800,000／損益分岐点 ¥38,400,000／安全余裕率 20%／在庫回転 3ヶ月）
+- [ ] サンプルで自動値が出る（既存客売上 4,710万円／客単価 6.9万円／リピート率 44.4%／粗利率 50%／営業利益 480万円／損益分岐点 3,840万円／安全余裕率 20%／在庫回転 3ヶ月）。金額の入力欄は万円
 - [ ] 新規客売上 > 総売上 で黄色の注記、入力中にフォーカスが外れない
 - [ ] 「②の間口カテゴリ名を取り込む」で重複しない
 - [ ] 前期の欄を追加→前期の自動値が出る→③が「前期との比較」
@@ -1214,7 +1317,7 @@ git commit -m "feat(v2.1): ⑤レポートに経営数値サマリーと経営�
 ```
 「④ 目標と戦略」に追加:
 ```markdown
-- [ ] 必要営業利益 6,000,000 → 必要売上 ¥50,400,000・間口で稼ぐべき ¥3,300,000。「反映」で期間1年・目標 3,300,000
+- [ ] 必要営業利益 600（万円） → 必要売上 5,040万円・間口で稼ぐべき 330万円。「反映」で期間12ヶ月・目標 330
 ```
 「⑤ レポート」の行を「9ページ（経営数値なしは7ページ）」に直す。
 
@@ -1239,4 +1342,4 @@ git commit -m "docs(v2.1): README と手動チェックリストを5ステップ
 - **仕様カバー**: §2 データ構造 → Task 1／§3 計算8項目 → Task 2（固定費の上書きだけ不採用＝Global Constraints に明記）／§4-1 ブロック7種 → Task 5／§4-2 2列貼り付け → Task 4・5／§4-3 検証 → Task 3・5／§5 健康度8ブロック＋目安値5項目 → Task 3・5・6／§6 必要利益 → Task 2・7／§7 レポート2ページ＋必要利益の表＋9ページ文言 → Task 8／§8 5ステップ・panel-5・README → Task 5・9／§9 収集シートは別成果物（コントローラーが作成）／§10 テスト → Task 1〜4 自動＋Task 5〜8 手動。
 - **型の整合**: `Sim.calc.mgmt()` の戻り値フィールド名（`existingRevenue, aov, newShare, repeatRate, visitFrequency, grossMarginPct, laborPct…, fixedCosts, operatingProfit, opMarginPct, breakEven, safetyMargin, inventoryTurnMonths, products[].share/contribution/contributionShare, funnel.visitRate/dealRate, replacement[].expectedBuyers, channels`）を Task 5（outputs）・6（parts）・8（report）で同名で参照。`mgmtHealth` の `ratios[].{value,prev,bench,diffPrev,diffBench}` を Task 6 `costBars` が参照。`requiredRevenue` の `{required,current,gap,existingForecast,newTarget,grossMarginPct,fixedCosts}` を Task 7 `requiredTable` が参照。
 - **Review Focus 5件**: 1→Task 3 `mgmtChecks`、2→Task 2「部分入力」＋Task 3 available、3→Task 1「v2 データ」、4→Task 2「粗利率0以下」、5→Task 4 `parseKeyValues`。
-- **Task 1〜4 のコードは計画作成時に現行コードへ適用して Node で実行し、78件すべて通ることを確認済み。**
+- **Task 1〜4 のコードは計画作成時に現行コードへ適用して Node で実行し、78件すべて通ることを確認済み。** 2026-09-24 に表示単位（Task 0・万円入力・2列貼り付けの万円化）を追補。
