@@ -49,23 +49,18 @@ Sim.ui = Sim.ui || {};
   function render(el, state, api) {
     const { esc, val, guide } = U(); const s = state.store; const b = state.benchmarks; const period = s.period;
     el.innerHTML = `
+      <p class="note-p">新規のお客様が最初に買う商品のくくり（間口カテゴリ）ごとに数字を入れます。①経営数値の新規客数・新規客売上と食い違う場合は③で注記が出ます。</p>
       <div class="sec-title"><span class="no">1</span><h2>店舗の前提</h2><span class="hint">店全体の数字</span></div>
       <div class="card globals">
         <div class="gbox"><label>店名</label><input type="text" data-path="store.name" value="${esc(s.name)}" placeholder="○○店"></div>
         <div class="gbox"><label>決算期（表示用）</label><input type="text" data-path="store.fiscalLabel" value="${esc(s.fiscalLabel)}" placeholder="2026年度（4月〜3月）"></div>
-        <div class="gbox"><label>原価率（物販）${guide('売上に対する仕入原価の割合です。粗利＝売上×（1−原価率）で計算します。')}</label><div class="row"><input type="number" min="0" max="100" data-type="num" data-path="store.cogsRate" value="${val(s.cogsRate)}"><span class="unit">%</span></div></div>
+        <div class="gbox"><label>原価率（物販）${guide('売上に対する仕入原価の割合です。粗利＝売上×（1−原価率）で計算します。①経営数値に仕入原価と総売上が入っていれば、そちらの値を優先します。')}<span data-out="cogs-auto"></span></label><div class="row"><input type="number" min="0" max="100" data-type="num" data-path="store.cogsRate" value="${val(s.cogsRate)}"><span class="unit">%</span></div></div>
         <div class="gbox"><label>固定費（任意・月額）</label><div class="row"><input type="number" min="0" step="10000" data-type="num" data-path="store.fixedCostMonthly" value="${val(s.fixedCostMonthly)}"><span class="unit">円/月</span></div></div>
       </div>
       <div class="sec-title"><span class="no">2</span><h2>間口カテゴリ</h2><span class="hint">最初に買ってもらう商品のくくりごとに入力${guide('「間口」＝新規のお客様が最初に買う商品のくくりです。レジや帳簿で「初めてのお客様が最初に買った物」を数えると出せます。人数が10人未満のカテゴリは診断を保留します。')}</span></div>
       <div class="products">${state.categories.map((c, i) => categoryCard(c, i, period)).join('')}</div>
       <button type="button" class="addbtn" data-action="add-category">＋ 間口カテゴリを追加</button>
       <div class="warnings" data-out="warnings"></div>
-      <details class="card optblock"><summary>集客経路（任意）— 経路ごとの新規人数と費用からCPAを出します</summary>
-        <div class="optbody"><table class="ltable"><tr><th>経路名</th><th>新規人数</th><th>費用（円・期間合計）</th><th>CPA</th><th></th></tr>
-          ${state.channels.map((ch, i) => `<tr><td><input type="text" data-path="channels.${i}.name" value="${esc(ch.name)}"></td><td><input type="number" min="0" data-type="num" data-path="channels.${i}.newCustomers" value="${val(ch.newCustomers)}"></td><td><input type="number" min="0" data-type="num" data-path="channels.${i}.cost" value="${val(ch.cost)}"></td><td data-out="cpa-${ch.id}"></td><td><button type="button" class="del dark" data-action="del-channel" data-index="${i}">✕</button></td></tr>`).join('')}
-        </table><button type="button" class="sbtn" data-action="add-channel">＋ 経路を追加</button>
-        <p class="note-p">経路の新規合計と間口カテゴリの新規合計は一致しなくて構いません（経路＝入口の話、カテゴリ＝買った物の話です）。</p></div>
-      </details>
       <details class="card optblock"><summary>目安値（任意）— 業界平均や自社の目標など、比べたい数字があれば</summary>
         <div class="optbody basebox">
           <div class="field"><span class="flabel">同日追加率の目安 %</span><input class="inp" type="number" data-type="optnum" data-path="benchmarks.sameDayRate" value="${val(b.sameDayRate)}"></div>
@@ -99,8 +94,6 @@ Sim.ui = Sim.ui || {};
       'del-category': d => { if (!confirm('この間口カテゴリを削除しますか？')) return; api.update(s => { s.categories.splice(+d.index, 1); }, { structural: true }); },
       'add-prev': d => api.update(s => { s.categories[+d.index].prev = Sim.state.emptyPrev(); }, { structural: true }),
       'del-prev': d => api.update(s => { s.categories[+d.index].prev = null; }, { structural: true }),
-      'add-channel': () => api.update(s => { s.channels.push(Sim.state.newChannel()); }, { structural: true }),
-      'del-channel': d => api.update(s => { s.channels.splice(+d.index, 1); }, { structural: true }),
       'paste-preview': () => { const text = el.querySelector('#paste-text').value; const res = Sim.paste.parse(text, { period: api.period }); pendingRows = res.rows; renderPreview(res, api, el); },
       'paste-apply': () => { if (!pendingRows || !pendingRows.length) return; const rows = pendingRows; pendingRows = null; let summary = [];
         api.update(s => { const r = Sim.paste.apply(s, rows); Object.assign(s, r.state); summary = r.summary; }, { structural: true });
@@ -109,12 +102,13 @@ Sim.ui = Sim.ui || {};
     };
   }
   function outputs(el, state) {
-    const { yen, fmt, esc } = U(); const period = state.store.period; const st = Sim.calc.store(state, period);
+    const { yen, fmt, fmt1, esc } = U(); const period = state.store.period; const st = Sim.calc.store(state, period);
     st.categories.forEach(c => {
       const box = el.querySelector(`[data-out="ltv-${c.id}"]`);
       if (box) box.innerHTML = `<div class="pltv-row"><span>間口購入</span><span>${yen(c.entryPrice)}</span></div><div class="pltv-row"><span>同日追加ぶん</span><span>${yen(c.sameDayPart)}</span></div><div class="pltv-row"><span>後日追加ぶん（${U().PERIOD_LABEL(period)}累計）</span><span>${yen(c.laterPart)}</span></div><div class="pltv-row pltv-total"><span>顧客あたりLTV（${U().PERIOD_LABEL(period)}）</span><span>${yen(c.ltv)}</span></div>`;
     });
-    st.channels.forEach(ch => { const td = el.querySelector(`[data-out="cpa-${ch.id}"]`); if (td) td.textContent = yen(ch.cpa); });
+    const cogsAuto = el.querySelector('[data-out="cogs-auto"]'); const m = state.mgmt;
+    if (cogsAuto) cogsAuto.innerHTML = (m && m.revenue > 0 && m.costs.cogs != null) ? `<span class="auto-tag">経営数値から自動：${fmt1(Sim.calc.effectiveCogsRate(state))}%</span>` : '';
     const w = Sim.analysis.checks(state); const wb = el.querySelector('[data-out="warnings"]');
     if (wb) wb.innerHTML = w.length ? `<ul class="warn">${w.map(x => `<li>${esc(x.message)}</li>`).join('')}</ul>` : '';
   }
