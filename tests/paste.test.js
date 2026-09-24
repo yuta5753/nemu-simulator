@@ -57,6 +57,9 @@ test('parseKeyValues: 万円で受ける・ラベル揺れ・記号・前期プ�
   eq(P.parseKeyValues('').values, {});
   const e = P.parseKeyValues('前期 総売上\t\n家賃\t'); eq(e.values, {}); eq(e.prev, {}); eq(e.warnings, [], '値が空の行は警告なしで飛ばす');
 });
+test('parseKeyValues: 「万」「万円」の単位表記を剥がしてから数値化する', () => {
+  eq(P.parseKeyValues('総売上\t4800万円').values, { revenue: 48000000 });
+});
 test('applyKeyValues: 値を反映し、前期があれば prev を作る', () => {
   const s = Sim.state.createEmpty(); const r = P.applyKeyValues(s, P.parseKeyValues('総売上\t100\n仕入原価\t40\n前期 総売上\t90'));
   eq(s.mgmt.revenue, null, '元は変えない'); eq(r.state.mgmt.revenue, 1000000); eq(r.state.mgmt.costs.cogs, 400000); eq(r.state.mgmt.prev.revenue, 900000); eq(r.count, 2); eq(r.prevCount, 1);

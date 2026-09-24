@@ -118,7 +118,7 @@ window.Sim = window.Sim || {};
   const pct1 = v => (v == null ? '—' : (Math.round(v * 1000) / 10) + '%');
   function mgmtHealth(state) {
     const m = Sim.calc.mgmt(state); if (!m.available) return { available: false };
-    const b = state.benchmarks; const p = m.prev;
+    const b = state.benchmarks || {}; const p = m.prev;
     const hasBench = b.grossMarginPct != null || b.laborPct != null || b.rentPct != null || b.adsPct != null || b.repeatRate != null;
     const mode = hasBench ? 'benchmark' : (p ? 'prev' : 'none');
     const mk = (key, label, value, prev, bench) => ({ key, label, value, prev, bench,
@@ -142,8 +142,8 @@ window.Sim = window.Sim || {};
   }
   function mgmtChecks(state) {
     const m = state.mgmt || {}; const w = []; const has = v => v != null;
-    if (has(m.revenue) && has(m.newRevenue) && m.newRevenue > m.revenue) w.push({ code: 'new_gt_total', message: '新規客売上が総売上を超えています。どちらかの数字をご確認ください' });
-    if (has(m.buyers) && has(m.newBuyers) && m.newBuyers > m.buyers) w.push({ code: 'new_gt_total', message: '新規客数が購入客数を超えています。どちらかの数字をご確認ください' });
+    if (has(m.revenue) && has(m.newRevenue) && m.newRevenue > m.revenue) w.push({ code: 'new_revenue_gt_total', message: '新規客売上が総売上を超えています。どちらかの数字をご確認ください' });
+    if (has(m.buyers) && has(m.newBuyers) && m.newBuyers > m.buyers) w.push({ code: 'new_buyers_gt_total', message: '新規客数が購入客数を超えています。どちらかの数字をご確認ください' });
     const v = m.visits || {}; const vs = [v.once, v.twice, v.threePlus];
     if (vs.every(has) && has(m.activeCustomers) && vs[0] + vs[1] + vs[2] > m.activeCustomers) w.push({ code: 'visits_gt_active', message: '来店回数別の客数の合計がアクティブ顧客数を超えています。数え方をご確認ください' });
     (m.products || []).forEach(x => { if (has(x.grossMarginPct) && (x.grossMarginPct < 0 || x.grossMarginPct > 100)) w.push({ code: 'gm_range', message: `${x.name || '商品'}：粗利率は0〜100%の範囲で入力します` }); });
@@ -160,12 +160,13 @@ window.Sim = window.Sim || {};
       return '';
     };
     if (m.grossMarginPct != null) out.push(`粗利率${pct1(m.grossMarginPct)}${ref(h.gross)}。営業利益は${m.operatingProfit == null ? '費用を入れると出ます' : yen(m.operatingProfit) + '（営業利益率' + pct1(m.opMarginPct) + '）'}。`);
-    if (m.breakEven != null) out.push(`損益分岐点売上は${yen(m.breakEven)}で、安全余裕率は${pct1(m.safetyMargin)}です。${m.safetyMargin < 0.1 ? '余裕が薄く、売上の小さな落ち込みが赤字に直結しやすい構造です。' : ''}`);
-    const worstRatio = h.ratios.filter(r => r.value != null && (r.diffBench != null || r.diffPrev != null)).sort((a, b) => ((b.diffBench != null ? b.diffBench : b.diffPrev) - (a.diffBench != null ? a.diffBench : a.diffPrev)))[0];
-    if (worstRatio) out.push(`費用比率で最も上振れているのは${worstRatio.label}${pct1(worstRatio.value)}${ref(worstRatio)}です。`);
+    if (m.breakEven != null) out.push(`損益分岐点売上は${yen(m.breakEven)}で、安全余裕率は${pct1(m.safetyMargin)}です。`);
+    const key = h.mode === 'benchmark' ? 'diffBench' : 'diffPrev';
+    const up = h.ratios.filter(r => r.value != null && r[key] != null && r[key] > 0).sort((a, b) => b[key] - a[key])[0];
+    if (up) out.push(`費用比率で${h.mode === 'benchmark' ? '目安' : '前期'}より上振れが大きいのは${up.label}${pct1(up.value)}${ref(up)}です。`);
     else h.ratios.filter(r => r.value != null).forEach(r => out.push(`${r.label}は${pct1(r.value)}です。`));
-    if (m.newShare != null) out.push(`売上の${pct1(1 - m.newShare)}が既存客によるものです。${m.newShare < 0.2 ? '既存客の維持が売上の土台になっています。' : '新規依存が高く、リピートの仕組みで安定させる余地があります。'}`);
-    if (m.repeatRate != null) out.push(`2回以上来店した方はアクティブ顧客の${pct1(m.repeatRate)}${ref(h.repeat)}です。`);
+    if (m.newShare != null) out.push(`売上の${pct1(1 - m.newShare)}が既存客、${pct1(m.newShare)}が新規客によるものです。${(h.repeat.bench != null || h.repeat.prev != null) ? '' : 'リピート率の目安値か前期を入れると、この構成の評価が出ます。'}`);
+    if (m.repeatRate != null) out.push(`来店回数を把握している${m.visitsTotal}人のうち、2回以上来店した方は${pct1(m.repeatRate)}${ref(h.repeat)}です。`);
     if (h.lowContribution.length) out.push(`${h.lowContribution.join('・')}は売上シェアに比べて粗利貢献が小さく、値付けか仕入の見直し余地がある可能性があります。`);
     const lv = Sim.calc.mgmtLeverage(state); if (lv) out.push(`営業利益に最も効くのは「${lv.top.label}」で、${yen(lv.top.delta)}の増加になる試算です。`);
     consistencyCheck(state).flags.forEach(f => out.push(f + '。'));

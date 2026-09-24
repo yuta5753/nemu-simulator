@@ -105,38 +105,45 @@ window.Sim = window.Sim || {};
     return state.store.cogsRate || 0;
   }
   const nz = v => (v == null || isNaN(v)) ? null : v;
+  const nn = v => { const x = nz(v); return x == null ? null : Math.max(0, x); };
   const div = (a, b) => (a == null || b == null || !(b > 0)) ? null : a / b;
   function mgmtCore(m) {
     m = m || {};
-    const revenue = nz(m.revenue), buyers = nz(m.buyers), newBuyers = nz(m.newBuyers), newRevenue = nz(m.newRevenue);
+    const revenue = nn(m.revenue), buyers = nn(m.buyers), newBuyers = nn(m.newBuyers), newRevenue = nn(m.newRevenue);
     const existingRevenue = (revenue != null && newRevenue != null) ? revenue - newRevenue : null;
-    const v = m.visits || {}; const vs = [nz(v.once), nz(v.twice), nz(v.threePlus)];
+    const v = m.visits || {}; const vs = [nn(v.once), nn(v.twice), nn(v.threePlus)];
     const visitsTotal = vs.every(x => x != null) ? vs[0] + vs[1] + vs[2] : null;
-    const c = m.costs || {}; const cogs = nz(c.cogs);
+    const c = m.costs || {}; const cogs = nn(c.cogs);
     const grossProfit = (revenue != null && cogs != null) ? revenue - cogs : null; const grossMarginPct = div(grossProfit, revenue);
     const costKeys = ['labor', 'rent', 'ads', 'other'];
-    const fixedCosts = costKeys.every(k => nz(c[k]) != null) ? costKeys.reduce((s, k) => s + c[k], 0) : null;
+    const costsClamped = { labor: nn(c.labor), rent: nn(c.rent), ads: nn(c.ads), other: nn(c.other) };
+    const fixedCosts = costKeys.every(k => costsClamped[k] != null) ? costKeys.reduce((s, k) => s + costsClamped[k], 0) : null;
     const operatingProfit = (grossProfit != null && fixedCosts != null) ? grossProfit - fixedCosts : null;
     const breakEven = (fixedCosts != null && grossMarginPct > 0) ? fixedCosts / grossMarginPct : null;
-    const prods = (m.products || []); const salesSum = prods.reduce((s, p) => s + (nz(p.sales) || 0), 0);
+    const prods = (m.products || []); const salesSum = prods.reduce((s, p) => s + (nn(p.sales) || 0), 0);
     const products = prods.map(p => {
-      const sales = nz(p.sales), gm = nz(p.grossMarginPct);
+      const sales = nn(p.sales), gm = nz(p.grossMarginPct);
       return { id: p.id, name: p.name, sales, grossMarginPct: gm, share: div(sales, salesSum), contribution: (sales != null && gm != null) ? sales * gm / 100 : null, contributionShare: null };
     });
     const contribSum = products.reduce((s, p) => s + (p.contribution || 0), 0);
     products.forEach(p => { p.contributionShare = (p.contribution != null && contribSum > 0) ? p.contribution / contribSum : null; });
     const f = m.funnel || {};
-    const funnel = { reservations: nz(f.reservations), visits: nz(f.visits), deals: nz(f.deals), visitRate: div(nz(f.visits), nz(f.reservations)), dealRate: div(nz(f.deals), nz(f.visits)) };
-    const replacement = (m.replacement || []).map(r => ({ id: r.id, name: r.name, cycleYears: nz(r.cycleYears), pastBuyers: nz(r.pastBuyers),
-      expectedBuyers: (nz(r.cycleYears) > 0 && nz(r.pastBuyers) != null) ? r.pastBuyers / r.cycleYears : null }));
+    const funnelClamped = { reservations: nn(f.reservations), visits: nn(f.visits), deals: nn(f.deals) };
+    const funnel = { reservations: funnelClamped.reservations, visits: funnelClamped.visits, deals: funnelClamped.deals,
+      visitRate: div(funnelClamped.visits, funnelClamped.reservations), dealRate: div(funnelClamped.deals, funnelClamped.visits) };
+    const replacement = (m.replacement || []).map(r => {
+      const cycleYears = nz(r.cycleYears), pastBuyers = nn(r.pastBuyers);
+      return { id: r.id, name: r.name, cycleYears, pastBuyers, expectedBuyers: (cycleYears > 0 && pastBuyers != null) ? pastBuyers / cycleYears : null };
+    });
+    const inventory = nn(m.inventory), activeCustomers = nn(m.activeCustomers);
     return {
-      revenue, buyers, newBuyers, newRevenue, itemsPerBuyer: nz(m.itemsPerBuyer), existingRevenue, aov: div(revenue, buyers), newShare: div(newRevenue, revenue),
-      activeCustomers: nz(m.activeCustomers), visits: { once: vs[0], twice: vs[1], threePlus: vs[2] }, visitsTotal,
-      repeatRate: visitsTotal > 0 ? (vs[1] + vs[2]) / visitsTotal : null, visitFrequency: div(buyers, nz(m.activeCustomers)), dormant: nz(m.dormant),
-      cogs, grossProfit, grossMarginPct, costs: { labor: nz(c.labor), rent: nz(c.rent), ads: nz(c.ads), other: nz(c.other) },
-      laborPct: div(nz(c.labor), revenue), rentPct: div(nz(c.rent), revenue), adsPct: div(nz(c.ads), revenue), otherPct: div(nz(c.other), revenue),
+      revenue, buyers, newBuyers, newRevenue, itemsPerBuyer: nn(m.itemsPerBuyer), existingRevenue, aov: div(revenue, buyers), newShare: div(newRevenue, revenue),
+      activeCustomers, visits: { once: vs[0], twice: vs[1], threePlus: vs[2] }, visitsTotal,
+      repeatRate: visitsTotal > 0 ? (vs[1] + vs[2]) / visitsTotal : null, visitFrequency: div(buyers, activeCustomers), dormant: nn(m.dormant),
+      cogs, grossProfit, grossMarginPct, costs: costsClamped,
+      laborPct: div(costsClamped.labor, revenue), rentPct: div(costsClamped.rent, revenue), adsPct: div(costsClamped.ads, revenue), otherPct: div(costsClamped.other, revenue),
       fixedCosts, operatingProfit, opMarginPct: div(operatingProfit, revenue), breakEven, safetyMargin: (breakEven != null && revenue > 0) ? (revenue - breakEven) / revenue : null,
-      inventory: nz(m.inventory), inventoryTurnMonths: (nz(m.inventory) != null && cogs > 0) ? m.inventory / (cogs / 12) : null,
+      inventory, inventoryTurnMonths: (inventory != null && cogs > 0) ? inventory / (cogs / 12) : null,
       products, funnel, replacement
     };
   }

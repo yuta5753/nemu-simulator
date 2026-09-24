@@ -79,8 +79,12 @@ test('consistencyCheck: 比が 0.8〜1.2 の外なら注記', () => {
 });
 test('mgmtChecks: 矛盾入力と範囲外', () => {
   const s = sample(); s.mgmt.newRevenue = 60000000; s.mgmt.visits.once = 800; s.mgmt.products[0].grossMarginPct = 150; s.mgmt.costs.labor = -1;
-  const codes = A.mgmtChecks(s).map(w => w.code).sort(); eq(codes, ['gm_range', 'negative', 'new_gt_total', 'visits_gt_active']);
+  const codes = A.mgmtChecks(s).map(w => w.code).sort(); eq(codes, ['gm_range', 'negative', 'new_revenue_gt_total', 'visits_gt_active']);
   eq(A.mgmtChecks(sample()), []);
+});
+test('mgmtChecks: visits.once だけが入力されていれば来店合計は判定せず visits_gt_active は出ない', () => {
+  const s = sample(); s.mgmt.visits.once = 800; s.mgmt.visits.twice = null; s.mgmt.visits.threePlus = null;
+  eq(A.mgmtChecks(s).some(w => w.code === 'visits_gt_active'), false);
 });
 test('mgmtComments: 文章が出る・空なら案内文', () => {
   const cm = A.mgmtComments(sample()); ok(cm.length >= 4); ok(cm.some(c => c.includes('粗利率50')));

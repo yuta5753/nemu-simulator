@@ -104,6 +104,13 @@ test('effectiveCogsRate: 経営数値があれば仕入原価÷総売上、無�
   approx(C.store(s, 3).grossProfit, 2376800 * 0.6, 0.01, 'store() も追随');
   s.mgmt.revenue = null; eq(C.effectiveCogsRate(s), 50);
 });
+test('effectiveCogsRate: 仕入原価が総売上を上回ると100%を超える（現状の仕様として記録）', () => {
+  const s = sample(); s.mgmt.costs.cogs = 60000000; eq(C.effectiveCogsRate(s), 125);
+});
+test('mgmt: 負の入力は0として扱われる（fixedCosts・laborPctがクランプされる）', () => {
+  const s = sample(); s.mgmt.costs.labor = -1000000; const m = C.mgmt(s);
+  eq(m.fixedCosts, 19200000 - 9600000); eq(m.laborPct, 0);
+});
 test('consistency: ②の新規合計と初回来店売上を①と比べる', () => {
   const c = C.consistency(sample()); eq(c.entryNewTotal, 100); eq(c.entryNewRevenue, 840000); eq(c.newBuyersRatio, 1); approx(c.newRevenueRatio, 0.9333, 0.001);
   const s = sample(); s.mgmt.newBuyers = null; eq(C.consistency(s).newBuyersRatio, null);

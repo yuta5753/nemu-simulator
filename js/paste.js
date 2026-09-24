@@ -119,13 +119,14 @@ window.Sim = window.Sim || {};
       if (label.startsWith('前期')) { isPrev = true; label = label.slice(2); }
       const path = Object.keys(KV_LABELS).find(k => KV_LABELS[k].some(a => normLabel(a) === label));
       if (!path) { warnings.push(`${li + 1}行目：「${m[1].trim()}」は認識できない項目のため飛ばしました`); return; }
-      const v = toNum(m[2]);
+      const valStr = m[2].trim().replace(/万円?$/, '');
+      const v = toNum(valStr);
       if (v == null) { warnings.push(`${li + 1}行目：「${m[1].trim()}」の値が数字ではありません`); return; }
       (isPrev ? prev : values)[path] = v;
     });
     // 金額は万円で受ける。1,000,000以上の金額があれば円で貼られたとみなす
     const amounts = [].concat(Object.keys(values).filter(k => AMOUNT_KEYS.includes(k)).map(k => values[k]), Object.keys(prev).filter(k => AMOUNT_KEYS.includes(k)).map(k => prev[k]));
-    if (amounts.some(v => v >= 1000000)) { if (amounts.length) warnings.push('金額が大きいため、円で貼られたものとして取り込みました（万円で貼ると小数も使えます）'); }
+    if (amounts.some(v => v >= 1000000)) { warnings.push('金額が大きいため、円で貼られたものとして取り込みました（万円で貼ると小数も使えます）'); }
     else { [values, prev].forEach(o => Object.keys(o).forEach(k => { if (AMOUNT_KEYS.includes(k)) o[k] = Math.round(o[k] * 10000); })); }
     return { values, prev, warnings };
   }
@@ -135,6 +136,7 @@ window.Sim = window.Sim || {};
     Object.keys(parsed.values).forEach(p => setDeep(s.mgmt, p, parsed.values[p]));
     const prevKeys = Object.keys(parsed.prev);
     if (prevKeys.length) { if (!s.mgmt.prev) s.mgmt.prev = Sim.state.normalizeMgmt({}, false); prevKeys.forEach(p => setDeep(s.mgmt.prev, p, parsed.prev[p])); }
+    s.mgmt = Sim.state.normalizeMgmt(s.mgmt, true);
     return { state: s, count: Object.keys(parsed.values).length, prevCount: prevKeys.length };
   }
   Sim.paste = { HEADERS, toNum, mapHeaders, parse, apply, KV_LABELS, AMOUNT_KEYS, parseKeyValues, applyKeyValues };
