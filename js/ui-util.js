@@ -36,12 +36,11 @@ Sim.ui = Sim.ui || {};
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => (n == null || isNaN(n)) ? '—' : Math.round(n).toLocaleString('ja-JP');
   const fmt1 = n => (n == null || isNaN(n)) ? '—' : (Math.round(n * 10) / 10).toLocaleString('ja-JP', { maximumFractionDigits: 1 });
-  const trim1 = v => (Math.round(v * 10) / 10).toLocaleString('ja-JP', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
   const yen = n => {
     if (n == null || isNaN(n)) return '—'; const a = Math.abs(n); const sign = n < 0 ? '−' : '';
     if (a < 10000) return sign + Math.round(a).toLocaleString('ja-JP') + '円';
-    if (a >= 100000000) return sign + trim1(a / 100000000) + '億円';
-    return sign + trim1(a / 10000) + '万円';
+    if (a >= 100000000) return sign + fmt1(a / 100000000) + '億円';
+    return sign + fmt1(a / 10000) + '万円';
   };
   const man = n => (n == null || isNaN(n)) ? '' : Math.round(n / 10000 * 10) / 10;
   const months = d => (d == null || isNaN(d)) ? '' : Math.round(d / 30 * 10) / 10;
