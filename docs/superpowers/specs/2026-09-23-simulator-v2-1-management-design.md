@@ -110,7 +110,7 @@ plan: {
 - newTarget ＝ requiredRevenue − existingForecast（＝間口で稼ぐべき1年の売上。負なら0）
 - 「間口の目標売上（1年）に反映」で `plan.targetRevenue[0] = round(newTarget)` を書く
 
-**原価率・固定費の優先（§4-1）**：`revenue>0 && cogs!=null` なら cogsRate ＝ cogs÷revenue×100、`fixedCosts` が揃えば fixedCostMonthly ＝ fixedCosts÷12 を**計算時に上書き**して使う（stateの手入力欄は書き換えない。画面に「経営数値から自動」と表示）。
+**原価率の優先（§4-1・2026-09-24 改訂）**：`revenue>0 && cogs!=null` なら cogsRate ＝ cogs÷revenue×100 を**計算時に上書き**して使う（stateの手入力欄は書き換えない。画面に「経営数値から自動」と表示）。固定費（月額）は間口分析には流さない（間口コホートの売上から店全体の固定費を引くと誤った営業利益になるため。実装計画の裁定）。
 
 ---
 
