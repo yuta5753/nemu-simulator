@@ -160,6 +160,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
 input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:3px solid var(--indigo);cursor:pointer}
 .gapbox{display:flex;gap:16px;flex-wrap:wrap;font-weight:800;font-size:14px;margin-bottom:10px}
 .gapbox .gap{color:var(--bad)}.gapbox .ok{color:var(--good)}
+.ltable td.gap{color:var(--bad);font-weight:800}.ltable td.ok{color:var(--good);font-weight:800}
 .reach{display:flex;align-items:center;gap:10px}
 .reach-bar{flex:1;height:12px;background:var(--washi-deep);border-radius:6px;overflow:hidden}
 .reach-fill{height:100%;background:linear-gradient(90deg,var(--gold-soft),var(--gold));width:0;transition:width .3s}
