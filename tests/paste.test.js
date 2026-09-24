@@ -47,3 +47,18 @@ test('apply: 名前一致は上書き、無ければ追加、シナリオのレ�
   eq(r.summary, [{name:'枕（フィッティング）', action:'update'}, {name:'掛け布団', action:'add'}]);
   ok(r.state.plan.scenarios.every(sc => sc.levers[c2.id]));
 });
+test('parseKeyValues: 万円で受ける・ラベル揺れ・記号・前期プレフィックス・未知行', () => {
+  const r = P.parseKeyValues('総売上\t¥4,800\n購入客数,700\n広告費\t180\n期末在庫金額　600\n来店3回以上\t150\n前期 総売上\t4000\n前期　人件費\t900\n謎の項目\t1\n人件費\tabc');
+  eq(r.values, { revenue: 48000000, buyers: 700, 'costs.ads': 1800000, inventory: 6000000, 'visits.threePlus': 150 });
+  eq(r.prev, { revenue: 40000000, 'costs.labor': 9000000 });
+  eq(r.warnings.length, 2); ok(r.warnings[0].includes('謎の項目')); ok(r.warnings[1].includes('人件費'));
+  const y = P.parseKeyValues('総売上\t48,000,000\n人件費\t9,600,000\n購入客数\t700'); eq(y.values, { revenue: 48000000, 'costs.labor': 9600000, buyers: 700 }); ok(y.warnings.some(w => w.includes('円で貼られた')));
+  eq(P.parseKeyValues('買上点数\t1.6').values, { itemsPerBuyer: 1.6 }, '人数・点数は変換しない');
+  eq(P.parseKeyValues('').values, {});
+  const e = P.parseKeyValues('前期 総売上\t\n家賃\t'); eq(e.values, {}); eq(e.prev, {}); eq(e.warnings, [], '値が空の行は警告なしで飛ばす');
+});
+test('applyKeyValues: 値を反映し、前期があれば prev を作る', () => {
+  const s = Sim.state.createEmpty(); const r = P.applyKeyValues(s, P.parseKeyValues('総売上\t100\n仕入原価\t40\n前期 総売上\t90'));
+  eq(s.mgmt.revenue, null, '元は変えない'); eq(r.state.mgmt.revenue, 1000000); eq(r.state.mgmt.costs.cogs, 400000); eq(r.state.mgmt.prev.revenue, 900000); eq(r.count, 2); eq(r.prevCount, 1);
+  const r2 = P.applyKeyValues(s, P.parseKeyValues('総売上\t100')); eq(r2.state.mgmt.prev, null);
+});

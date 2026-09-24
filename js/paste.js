@@ -100,5 +100,42 @@ window.Sim = window.Sim || {};
     Sim.state.syncScenarios(s);
     return { state: s, summary };
   }
-  Sim.paste = { HEADERS, toNum, mapHeaders, parse, apply };
+  const KV_LABELS = {
+    revenue: ['総売上', '売上高', '総売上高'], buyers: ['購入客数', '客数'], newBuyers: ['新規客数', '新規顧客数'], newRevenue: ['新規客売上', '新規売上'],
+    itemsPerBuyer: ['買上点数'], activeCustomers: ['アクティブ顧客数', '顧客数'], 'visits.once': ['来店1回'], 'visits.twice': ['来店2回'], 'visits.threePlus': ['来店3回以上'],
+    dormant: ['休眠客数'], inventory: ['期末在庫', '期末在庫金額', '在庫金額'], 'costs.cogs': ['仕入原価', '売上原価'], 'costs.labor': ['人件費'], 'costs.rent': ['家賃', '地代家賃'],
+    'costs.ads': ['広告宣伝費', '広告費'], 'costs.other': ['その他経費', 'その他'], 'funnel.reservations': ['予約数'], 'funnel.visits': ['来店数'], 'funnel.deals': ['成約数']
+  };
+  const AMOUNT_KEYS = ['revenue', 'newRevenue', 'inventory', 'costs.cogs', 'costs.labor', 'costs.rent', 'costs.ads', 'costs.other'];
+  const normLabel = s => String(s == null ? '' : s).replace(/[\s　"]/g, '').replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+  function parseKeyValues(text) {
+    const values = {}, prev = {}, warnings = [];
+    String(text || '').split(/\r?\n/).forEach((line, li) => {
+      if (line.trim() === '') return;
+      const m = line.match(/^([^\t,]+)[\t,]\s*(.*)$/) || line.match(/^(\S+)[\s　]+(\S+)$/);
+      if (!m) { warnings.push(`${li + 1}行目：「項目名 TAB 値」の形になっていません`); return; }
+      if (m[2].trim() === '') return;   // 値が空の行（テンプレの未記入行）は黙って飛ばす
+      let label = normLabel(m[1]); let isPrev = false;
+      if (label.startsWith('前期')) { isPrev = true; label = label.slice(2); }
+      const path = Object.keys(KV_LABELS).find(k => KV_LABELS[k].some(a => normLabel(a) === label));
+      if (!path) { warnings.push(`${li + 1}行目：「${m[1].trim()}」は認識できない項目のため飛ばしました`); return; }
+      const v = toNum(m[2]);
+      if (v == null) { warnings.push(`${li + 1}行目：「${m[1].trim()}」の値が数字ではありません`); return; }
+      (isPrev ? prev : values)[path] = v;
+    });
+    // 金額は万円で受ける。1,000,000以上の金額があれば円で貼られたとみなす
+    const amounts = [].concat(Object.keys(values).filter(k => AMOUNT_KEYS.includes(k)).map(k => values[k]), Object.keys(prev).filter(k => AMOUNT_KEYS.includes(k)).map(k => prev[k]));
+    if (amounts.some(v => v >= 1000000)) { if (amounts.length) warnings.push('金額が大きいため、円で貼られたものとして取り込みました（万円で貼ると小数も使えます）'); }
+    else { [values, prev].forEach(o => Object.keys(o).forEach(k => { if (AMOUNT_KEYS.includes(k)) o[k] = Math.round(o[k] * 10000); })); }
+    return { values, prev, warnings };
+  }
+  function setDeep(obj, path, value) { const keys = path.split('.'); let o = obj; for (let i = 0; i < keys.length - 1; i++) { if (o[keys[i]] == null) o[keys[i]] = {}; o = o[keys[i]]; } o[keys[keys.length - 1]] = value; }
+  function applyKeyValues(state, parsed) {
+    const s = JSON.parse(JSON.stringify(state)); s.mgmt = s.mgmt || Sim.state.emptyMgmt();
+    Object.keys(parsed.values).forEach(p => setDeep(s.mgmt, p, parsed.values[p]));
+    const prevKeys = Object.keys(parsed.prev);
+    if (prevKeys.length) { if (!s.mgmt.prev) s.mgmt.prev = Sim.state.normalizeMgmt({}, false); prevKeys.forEach(p => setDeep(s.mgmt.prev, p, parsed.prev[p])); }
+    return { state: s, count: Object.keys(parsed.values).length, prevCount: prevKeys.length };
+  }
+  Sim.paste = { HEADERS, toNum, mapHeaders, parse, apply, KV_LABELS, AMOUNT_KEYS, parseKeyValues, applyKeyValues };
 })();
