@@ -126,7 +126,8 @@ window.Sim = window.Sim || {};
       const v = toNum(valStr);
       if (v == null) { warnings.push(`${li + 1}行目：「${m[1].trim()}」の値が数字ではありません`); return; }
       (isPrev ? prev : values)[path] = v;
-      if (hasMan) (isPrev ? manPrev : manValues).add(path);
+      const manSet = isPrev ? manPrev : manValues;
+      if (hasMan) manSet.add(path); else manSet.delete(path);
     });
     // 金額は万円で受ける。明示的な「万」表記を除いて1,000,000以上の金額があれば円で貼られたとみなす
     const amounts = [].concat(

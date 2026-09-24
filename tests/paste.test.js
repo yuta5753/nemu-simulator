@@ -65,6 +65,10 @@ test('parseKeyValues: 円貼り付けと万貼り付けが混在しても、万�
   eq(r.values, { revenue: 48000000, 'costs.ads': 1800000, 'costs.labor': 9600000 });
   ok(r.warnings.some(w => w.includes('円で貼られた')));
 });
+test('parseKeyValues: 同一項目が重複するとき、万フラグは後の行の表記で更新される', () => {
+  eq(P.parseKeyValues('総売上\t480万\n総売上\t9000000').values, { revenue: 9000000 });
+  eq(P.parseKeyValues('総売上\t9000000\n総売上\t480万').values, { revenue: 4800000 });
+});
 test('applyKeyValues: 値を反映し、前期があれば prev を作る', () => {
   const s = Sim.state.createEmpty(); const r = P.applyKeyValues(s, P.parseKeyValues('総売上\t100\n仕入原価\t40\n前期 総売上\t90'));
   eq(s.mgmt.revenue, null, '元は変えない'); eq(r.state.mgmt.revenue, 1000000); eq(r.state.mgmt.costs.cogs, 400000); eq(r.state.mgmt.prev.revenue, 900000); eq(r.count, 2); eq(r.prevCount, 1);
