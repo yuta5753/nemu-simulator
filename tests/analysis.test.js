@@ -61,3 +61,29 @@ test('comments: 文章が出る・カテゴリ名を含む・空なら案内文'
   ok(cm.some(c => c.includes('目安値か前期')));
   const e = A.comments(Sim.state.createEmpty(), 3); eq(e, ['間口カテゴリを入力すると診断コメントが出ます。']);
 });
+test('mgmtHealth: サンプルは none モードで比率が揃う', () => {
+  const h = A.mgmtHealth(sample()); ok(h.available); eq(h.mode, 'none');
+  const r = Object.fromEntries(h.ratios.map(x => [x.key, x.value])); eq(r.laborPct, 0.2); eq(r.rentPct, 0.075); eq(r.adsPct, 0.0375); eq(r.otherPct, 0.0875);
+  eq(h.gross.value, 0.5); approx(h.repeat.value, 400 / 900, 1e-6); eq(h.lowContribution, ['マットレス']);
+  eq(A.mgmtHealth(Sim.state.createEmpty()).available, false);
+});
+test('mgmtHealth: 前期があれば prev モードで差分、目安値があれば benchmark モード', () => {
+  const s = sample(); s.mgmt.prev = Sim.state.normalizeMgmt({ revenue: 40000000, costs: { cogs: 21000000, labor: 9000000, rent: 3600000, ads: 1500000, other: 4000000 } }, false);
+  let h = A.mgmtHealth(s); eq(h.mode, 'prev'); const labor = h.ratios.find(x => x.key === 'laborPct'); approx(labor.diffPrev, 0.2 - 0.225, 1e-6);
+  s.benchmarks.laborPct = 18; h = A.mgmtHealth(s); eq(h.mode, 'benchmark'); approx(h.ratios.find(x => x.key === 'laborPct').diffBench, 0.02, 1e-6);
+});
+test('consistencyCheck: 比が 0.8〜1.2 の外なら注記', () => {
+  eq(A.consistencyCheck(sample()).flags, []);
+  const s = sample(); s.mgmt.newBuyers = 200; const c = A.consistencyCheck(s); eq(c.flags.length, 1); ok(c.flags[0].includes('新規人数') && c.flags[0].includes('50%'));
+  s.mgmt.newBuyers = null; eq(A.consistencyCheck(s).flags, []);
+});
+test('mgmtChecks: 矛盾入力と範囲外', () => {
+  const s = sample(); s.mgmt.newRevenue = 60000000; s.mgmt.visits.once = 800; s.mgmt.products[0].grossMarginPct = 150; s.mgmt.costs.labor = -1;
+  const codes = A.mgmtChecks(s).map(w => w.code).sort(); eq(codes, ['gm_range', 'negative', 'new_gt_total', 'visits_gt_active']);
+  eq(A.mgmtChecks(sample()), []);
+});
+test('mgmtComments: 文章が出る・空なら案内文', () => {
+  const cm = A.mgmtComments(sample()); ok(cm.length >= 4); ok(cm.some(c => c.includes('粗利率50')));
+  ok(cm.some(c => c.includes('損益分岐点'))); ok(cm.some(c => c.includes('売上 +10%')));
+  eq(A.mgmtComments(Sim.state.createEmpty()), ['①経営数値を入れると経営の健康度が出ます。']);
+});
