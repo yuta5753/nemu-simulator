@@ -210,6 +210,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 .lev-inline{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .lev-inline div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--text-soft)}
 .lev-inline div b{display:block;font-size:15px;color:var(--ink)}.lev-inline div.top{border-color:var(--gold);box-shadow:0 0 0 2px rgba(184,146,74,.3)}
+hr.sep{border:none;border-top:2px dashed var(--line);margin:28px 0 8px}
 @media(max-width:880px){
   .stepper{grid-template-columns:repeat(2,1fr)}
   .globals{grid-template-columns:1fr}.gbox{border-right:none;border-bottom:1px solid var(--line)}.gbox:last-child{border-bottom:none}
