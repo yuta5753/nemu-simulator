@@ -97,7 +97,7 @@ test('v3: createSample の経営数値と serialize/parse 往復', () => {
   eq(m.revenue, 48000000); eq(m.buyers, 700); eq(m.newBuyers, 100); eq(m.newRevenue, 900000); eq(m.costs.cogs, 24000000); eq(m.products.length, 4); eq(m.replacement[0].cycleYears, 8);
   const p = S.parseStore(S.serializeStore(s)); p.meta.updatedAt = s.meta.updatedAt; eq(p, s);
 });
-test('v3: 未来バージョン 4 は拒否', () => { throws(() => S.normalizeStore({ version: 5 })); });
+test('v3: 未来バージョン 5 は拒否', () => { throws(() => S.normalizeStore({ version: 5 })); });
 test('v4: createEmpty は店舗1つの会社。activeStoreId はその店舗', () => {
   const c = S.createEmpty(); eq(c.version, 4); eq(c.stores.length, 1); eq(c.activeStoreId, c.stores[0].store.id);
   eq(c.company.hq, { labor: null, rent: null, ads: null, other: null }); eq(c.company.plan, { requiredProfit: null, existingGrowthPct: 0 }); eq(c.company.name, '');
