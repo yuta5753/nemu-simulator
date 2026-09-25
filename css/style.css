@@ -212,6 +212,23 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 .lev-inline div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--text-soft)}
 .lev-inline div b{display:block;font-size:15px;color:var(--ink)}.lev-inline div.top{border-color:var(--gold);box-shadow:0 0 0 2px rgba(184,146,74,.3)}
 hr.sep{border:none;border-top:2px dashed var(--line);margin:28px 0 8px}
+.storebar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:16px auto 0}
+.storebar button{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-weight:800;font-size:13px;cursor:pointer;color:var(--text-soft);display:flex;align-items:center;gap:6px;transition:.15s}
+.storebar button .no{font-family:"Times New Roman",serif;font-size:11px;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--line);color:var(--ink)}
+.storebar button.active{background:var(--gold);color:var(--ink);border-color:var(--gold)}
+.storebar button.active .no{background:var(--ink);color:#fff}
+.storebar button:not(.active):hover{border-color:var(--gold)}
+.storebar .spacer{flex:1}
+.storebar button.add{border-style:dashed;font-weight:700;font-size:12px}
+.cmp-wrap{overflow-x:auto}
+.cmp-table th,.cmp-table td{white-space:nowrap;text-align:right}
+.cmp-table th:first-child,.cmp-table td:first-child{text-align:left}
+.cmp-table td.co{font-weight:800;background:rgba(58,90,140,.06)}
+.mark{display:inline-block;margin-left:4px;font-size:11px;font-weight:800}
+.mark.best{color:var(--good)}.mark.worst{color:var(--bad)}.mark.mid{color:var(--text-soft)}
+.store-list td .sbtn{margin:0 4px 0 0;padding:4px 8px}
+.ltable tr.total td{font-weight:800;border-top:2px solid var(--line);border-bottom:none}
+.note-p.ok{color:var(--good);font-weight:700}
 @media(max-width:880px){
   .stepper{grid-template-columns:repeat(2,1fr)}
   .globals{grid-template-columns:1fr}.gbox{border-right:none;border-bottom:1px solid var(--line)}.gbox:last-child{border-bottom:none}
