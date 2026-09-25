@@ -10,14 +10,15 @@ Sim.ui = Sim.ui || {};
     });
     const sum = k => (rows.some(r => r[k] != null) ? rows.reduce((a, r) => a + (r[k] || 0), 0) : null);
     const allRequired = rows.length > 0 && rows.every(r => r.required != null); const allTarget = rows.length > 0 && rows.every(r => r.target > 0);
+    const allRevenue = rows.length > 0 && rows.every(r => r.revenue != null);
     const target = allTarget ? sum('target') : null; const scen = sum('scenarioRevenue');
-    return { rows, allRequired, allTarget, total: { revenue: sum('revenue'), required: allRequired ? sum('required') : null, target, scenarioRevenue: scen, reach: (allTarget && target > 0 && scen != null) ? scen / target * 100 : null }, company: Sim.calc.companyRequired(company) };
+    return { rows, allRequired, allTarget, allRevenue, total: { revenue: allRevenue ? sum('revenue') : null, required: allRequired ? sum('required') : null, target, scenarioRevenue: scen, reach: (allTarget && target > 0 && scen != null) ? scen / target * 100 : null }, company: Sim.calc.companyRequired(company) };
   }
   function rollupTable(r, period) {
     const { esc, yen, fmt1 } = U(); const cell = v => (v == null ? '—' : yen(v)); const reach = v => (v == null ? '—' : fmt1(v) + '%');
     return `<div class="cmp-wrap"><table class="ltable cmp-table"><tr><th>店舗</th><th>現状売上（年）</th><th>店舗の必要売上</th><th>間口の目標売上（${U().PERIOD_LABEL(period)}）</th><th>今の配分での売上</th><th>到達率</th></tr>
       ${r.rows.map(x => `<tr><td>${esc(x.name)}</td><td>${cell(x.revenue)}</td><td>${cell(x.required)}</td><td>${cell(x.target)}</td><td>${cell(x.scenarioRevenue)}</td><td>${reach(x.reach)}</td></tr>`).join('')}
-      <tr class="total"><td>合計</td><td>${cell(r.total.revenue)}</td><td>${r.allRequired ? cell(r.total.required) : '—（未入力の店舗あり）'}</td><td>${r.allTarget ? cell(r.total.target) : '—（未入力の店舗あり）'}</td><td>${cell(r.total.scenarioRevenue)}</td><td>${reach(r.total.reach)}</td></tr></table></div>`;
+      <tr class="total"><td>合計</td><td>${r.allRevenue ? cell(r.total.revenue) : '—（未入力の店舗あり）'}</td><td>${r.allRequired ? cell(r.total.required) : '—（未入力の店舗あり）'}</td><td>${r.allTarget ? cell(r.total.target) : '—（未入力の店舗あり）'}</td><td>${cell(r.total.scenarioRevenue)}</td><td>${reach(r.total.reach)}</td></tr></table></div>`;
   }
   function absorptionBlock(r) {
     const { yen } = U(); const co = r.company;
@@ -26,7 +27,7 @@ Sim.ui = Sim.ui || {};
     const diff = co.required - r.total.required;
     if (diff === 0) return `<p class="note-p ok">店舗ごとの必要売上の合計 ${yen(r.total.required)} は、全社の必要売上とちょうど同じです。店舗目標を足し合わせれば本部費を賄える計算です。</p>`;
     return diff > 0
-      ? `<ul class="warn"><li>店舗ごとの必要売上の合計 ${yen(r.total.required)} では、本部費＋全社の必要利益（必要売上 ${yen(co.required)}）に届きません。差 ${yen(diff)} を各店舗の目標に上乗せする必要があります（割り振りは各店舗タブで行います）。</li></ul>`
+      ? `<ul class="warn"><li>店舗ごとの必要売上の合計 ${yen(r.total.required)} では、本部費＋全社の必要利益（必要売上 ${yen(co.required)}）に届きません。差 ${yen(diff)} を各店舗の目標に上乗せすると届く計算です（割り振りは各店舗タブで行います）。</li></ul>`
       : `<p class="note-p ok">店舗ごとの必要売上の合計 ${yen(r.total.required)} は、全社の必要売上 ${yen(co.required)} を ${yen(-diff)} 上回っています。店舗目標を足し合わせれば本部費を賄える計算です。</p>`;
   }
   function renderPlan(el, company, api) {
@@ -47,7 +48,7 @@ Sim.ui = Sim.ui || {};
   function outputsPlan(el, company, api) {
     const set = (k, html) => { const n = el.querySelector(`[data-out="${k}"]`); if (n) n.innerHTML = html; };
     const r = rollup(company, api.period);
-    set('co-required', PP().requiredTable(r.company) + (r.company ? '<p class="note-p">固定費には本部費を含めています。「間口で稼ぐべき売上」は全社合計の目安で、店舗の目標には自動反映しません。</p>' : ''));
+    set('co-required', r.company ? PP().requiredTable(r.company) + '<p class="note-p">固定費には本部費を含めています。「間口で稼ぐべき売上」は全社合計の目安で、店舗の目標には自動反映しません。</p>' : '<p class="note-p">上の必要営業利益を入れると、本部費込みの必要売上が出ます（各店舗の①で費用の構造が揃っていることが前提です）。</p>');
     set('co-rollup', rollupTable(r, api.period)); set('co-absorb', absorptionBlock(r));
   }
   function renderReport(el, company, api) {

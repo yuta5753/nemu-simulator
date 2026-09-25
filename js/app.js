@@ -17,7 +17,7 @@ window.Sim = window.Sim || {};
   function applyGuide(el) { if (document.body.classList.contains('guide-open')) el.querySelectorAll('details.guide').forEach(d => { d.open = true; }); }
   function update(fn, opts) {
     opts = opts || {}; const s = active(); if (!s) return;
-    fn(s); Sim.state.syncScenarios(s); Sim.state.syncShared(app.company, app.company.stores.indexOf(s)); touch();
+    fn(s); Sim.state.syncScenarios(s); Sim.state.syncShared(app.company, app.company.stores.indexOf(s)); touch(); renderStoreBar();
     if (opts.structural) renderStep(); else refreshStep();
   }
   function updateCompany(fn, opts) {
@@ -28,7 +28,7 @@ window.Sim = window.Sim || {};
   const companyApi = { update: updateCompany, setStep, getState: () => app.company, getCompany: () => app.company, get period() { return periodOf(); }, setStore, exportStore, pickStoreFile };
   function renderHeader() {
     const s = active(); const multi = app.company.stores.length > 1;
-    const parts = [app.company.company.name, s ? s.store.name : (multi ? '全社' : '')].filter(Boolean);
+    const parts = [multi ? app.company.company.name : '', s ? s.store.name : (multi ? '全社' : '')].filter(Boolean);
     $('head-title').textContent = parts.concat('売上シミュレーター').join('｜'); document.title = parts.concat('店舗 売上シミュレーター').join('｜');
     const p = periodOf(); document.querySelectorAll('#periodbar button, #floatp button').forEach(b => b.classList.toggle('active', +b.dataset.p === p));
   }
@@ -53,7 +53,7 @@ window.Sim = window.Sim || {};
   }
   function setStore(id) {
     app.company.activeStoreId = id || null; if (app.company.stores.length === 1) app.company.activeStoreId = app.company.stores[0].store.id;
-    persist(); renderStoreBar(); renderStep(); window.scrollTo({ top: 0 });
+    reportDirty = true; persist(); renderStoreBar(); renderStep(); window.scrollTo({ top: 0 });
   }
   function setPeriod(p) { const src = active() || app.company.stores[0]; src.store.period = p; Sim.state.syncShared(app.company, app.company.stores.indexOf(src)); touch(); renderStep(); }
   function replaceCompany(next) { app.company = next; app.company.stores.forEach(s => Sim.state.syncScenarios(s)); persist(); reportDirty = true; renderStoreBar(); renderStep(); }
@@ -73,7 +73,7 @@ window.Sim = window.Sim || {};
     readFile(file, text => {
       try {
         const next = Sim.state.parse(text); let raw = null; try { raw = JSON.parse(text); } catch (e) { raw = null; }
-        const isStoreFile = !(raw && Array.isArray(raw.stores));
+        const isStoreFile = !(raw && Array.isArray(raw.stores)) || raw.stores.length === 1;
         const msg = (isStoreFile && app.company.stores.length > 1)
           ? '店舗ファイルです。今の内容（全店舗）をこの店舗1つに置き換えます。店舗として追加したい場合は「＋ ファイルから店舗」をお使いください。よろしいですか？'
           : '今の内容を、読み込んだ内容で置き換えます。よろしいですか？';
