@@ -74,13 +74,14 @@ Sim.ui = Sim.ui || {};
       <div><div class="k">安全余裕率</div><div class="v">${pctS(m.safetyMargin)}</div></div>
     </div>`;
   }
-  function waterfallSvg(m) {
+  function waterfallSvg(m, extra) {
     const { yen } = U();
     if (m.revenue == null || m.cogs == null) return '<p class="note-p">総売上と仕入原価を入れると収益構造の図が出ます。</p>';
     const steps = [{ l: '売上', v: m.revenue, t: 'total' }, { l: '仕入原価', v: -m.cogs, t: 'minus' }, { l: '粗利', v: m.grossProfit, t: 'total' }];
     const c = m.costs; const add = (l, v) => { if (v != null) steps.push({ l, v: -v, t: 'minus' }); };
     add('人件費', c.labor); add('家賃', c.rent); add('広告費', c.ads); add('その他', c.other);
     if (m.operatingProfit != null) steps.push({ l: '営業利益', v: m.operatingProfit, t: m.operatingProfit >= 0 ? 'profit' : 'loss' });
+    (extra || []).forEach(s => steps.push(s));
     const W = 720, H = 300, P = 40, bw = (W - 2 * P) / steps.length; const max = Math.max(m.revenue, 1);
     let levelCalc = 0; const allLevels = []; const totalsAndProfit = [];
     steps.forEach(s => {

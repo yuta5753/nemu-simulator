@@ -85,6 +85,7 @@ Sim.ui = Sim.ui || {};
         <div class="gbox"><label>反映</label><div class="row"><button type="button" class="sbtn primary" data-action="apply-required">間口の目標売上（1年）に反映</button></div></div>
       </div>
       <div class="card pad" data-out="required"></div>
+      ${(api.getCompany && api.getCompany().stores.length > 1) ? '<p class="note-p">ここは店舗単位の数字です。本部費を含めた全社の逆算は「全社」タブの④で行います。</p>' : ''}
       <div class="sec-title"><span class="no">1</span><h2>目標設定と逆算（${U().PERIOD_LABEL(period)}で見た場合）</h2><span class="hint">${guide('期間累計の目標売上を入れると、現状とのギャップと「レバー1本だけで埋める場合の必要量」が出ます。実際は複数のレバーを組み合わせるので、下のシナリオで配分します。')}</span></div>
       <div class="card globals">
         <div class="gbox"><label>目標売上（${U().PERIOD_LABEL(period)}累計）</label><div class="row"><input type="number" min="0" step="10" data-type="man" data-path="plan.targetRevenue.${period - 1}" value="${U().man(plan.targetRevenue[period - 1])}"><span class="unit">万円</span></div></div>

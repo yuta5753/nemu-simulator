@@ -1,5 +1,5 @@
 const A = Sim.analysis;
-const sample = () => Sim.state.createSample();
+const sample = () => Sim.state.createSampleStore();
 test('portfolio: 2件は平均が境界。枕=主力、敷きもの=見直す', () => {
   const pf = A.portfolio(sample(), 3);
   ok(pf.available); approx(pf.xBoundary, 420000, 0.01); approx(pf.yBoundary, 16660, 0.01);
@@ -59,13 +59,13 @@ test('checks: 範囲外の入力に out_of_range が出て、計算は上限・�
 test('comments: 文章が出る・カテゴリ名を含む・空なら案内文', () => {
   const cm = A.comments(sample(), 3); ok(cm.length >= 4); ok(cm.some(c => c.includes('枕（フィッティング）') && c.includes('主力')));
   ok(cm.some(c => c.includes('目安値か前期')));
-  const e = A.comments(Sim.state.createEmpty(), 3); eq(e, ['間口カテゴリを入力すると診断コメントが出ます。']);
+  const e = A.comments(Sim.state.createEmptyStore(), 3); eq(e, ['間口カテゴリを入力すると診断コメントが出ます。']);
 });
 test('mgmtHealth: サンプルは none モードで比率が揃う', () => {
   const h = A.mgmtHealth(sample()); ok(h.available); eq(h.mode, 'none');
   const r = Object.fromEntries(h.ratios.map(x => [x.key, x.value])); eq(r.laborPct, 0.2); eq(r.rentPct, 0.075); eq(r.adsPct, 0.0375); eq(r.otherPct, 0.0875);
   eq(h.gross.value, 0.5); approx(h.repeat.value, 400 / 900, 1e-6); eq(h.lowContribution, ['マットレス']);
-  eq(A.mgmtHealth(Sim.state.createEmpty()).available, false);
+  eq(A.mgmtHealth(Sim.state.createEmptyStore()).available, false);
 });
 test('mgmtHealth: 前期があれば prev モードで差分、目安値があれば benchmark モード', () => {
   const s = sample(); s.mgmt.prev = Sim.state.normalizeMgmt({ revenue: 40000000, costs: { cogs: 21000000, labor: 9000000, rent: 3600000, ads: 1500000, other: 4000000 } }, false);
@@ -89,9 +89,26 @@ test('mgmtChecks: visits.once だけが入力されていれば来店合計は�
 test('mgmtComments: 文章が出る・空なら案内文', () => {
   const cm = A.mgmtComments(sample()); ok(cm.length >= 4); ok(cm.some(c => c.includes('粗利率50')));
   ok(cm.some(c => c.includes('損益分岐点'))); ok(cm.some(c => c.includes('売上 +10%')));
-  eq(A.mgmtComments(Sim.state.createEmpty()), ['①経営数値を入れると経営の健康度が出ます。']);
+  eq(A.mgmtComments(Sim.state.createEmptyStore()), ['①経営数値を入れると経営の健康度が出ます。']);
 });
 test('mgmtComments: 総売上のみでは何も言えることがなく、空コメント案内文が出る', () => {
-  const s = Sim.state.createEmpty(); s.mgmt.revenue = 10000000;
+  const s = Sim.state.createEmptyStore(); s.mgmt.revenue = 10000000;
   eq(A.mgmtComments(s), ['費用の構造や顧客の構成を入れると、ここにコメントが出ます。']);
+});
+test('companyHealth: 合算の健康度と比較モード', () => {
+  const c = Sim.state.createSample(); const h = A.companyHealth(c); ok(h.available); eq(h.mode, 'none'); approx(h.gross.value, 0.5, 1e-9); eq(h.coverageNote, null); eq(h.cm.hq.total, 4800000);
+  eq(h.ratios.map(r => r.key), ['laborPct', 'rentPct', 'adsPct', 'otherPct']); approx(h.ratios[0].value, 15600000 / 76800000, 1e-9);
+  c.stores[0].benchmarks.laborPct = 18; Sim.state.syncShared(c, 0); const h2 = A.companyHealth(c); eq(h2.mode, 'benchmark'); approx(h2.ratios[0].diffBench, 15600000 / 76800000 - 0.18, 1e-9);
+  eq(A.companyHealth(Sim.state.createEmpty()).available, false);
+});
+test('companyHealth: カバレッジ注記', () => {
+  const c = Sim.state.createSample(); c.stores[1].mgmt.costs.labor = null; eq(A.companyHealth(c).coverageNote, '空欄の店舗は合算に含めていません（人件費 1／2店舗）');
+  c.stores[1].mgmt.visits.once = null; eq(A.companyHealth(c).coverageNote, '空欄の店舗は合算に含めていません（来店回数別 1／2店舗、人件費 1／2店舗）');
+});
+test('companyComments: 最大5件・本部費の文・未入力の文・空の案内', () => {
+  const c = Sim.state.createSample(); const out = A.companyComments(c, 3); ok(out.length <= 5); ok(out.some(t => t.includes('粗利率'))); ok(out.some(t => t.includes('人件費率が最も高いのは2号店')));
+  ok(out.some(t => t.includes('本部費480万円')), out.join('|')); ok(out.some(t => t.includes('損益分岐点売上は7,240万円')), out.join('|'));
+  c.company.hq = { labor: null, rent: null, ads: null, other: null }; const o2 = A.companyComments(c, 3); ok(o2.some(t => t.includes('本部費が未入力'))); ok(!o2.some(t => t.includes('にあたります')));
+  c.stores[1].mgmt.costs.labor = null; ok(A.companyComments(c, 3).some(t => t.includes('空欄の店舗は合算に含めていません')));
+  eq(A.companyComments(Sim.state.createEmpty(), 3), ['店舗タブで経営数値を入れると、全社の合算とコメントが出ます。']);
 });

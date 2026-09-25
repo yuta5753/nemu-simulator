@@ -14,11 +14,12 @@
     <div class="head-row">
       <div>
         <h1 id="head-title">店舗 売上シミュレーター</h1>
-        <p id="head-sub">経営数値と間口カテゴリを入れて診断し、目標とレバー配分まで設計します。入力は自動保存されます。</p>
+        <p id="head-sub">経営数値と間口カテゴリを入れて診断し、目標とレバー配分まで設計します。複数店舗は店舗タブで切り替え、「全社」で合算を見ます。入力は自動保存されます。</p>
       </div>
       <div class="head-tools">
         <button type="button" class="tbtn" data-app="export">書き出し（JSON）</button>
         <label class="tbtn">読み込み<input type="file" id="import-file" accept="application/json,.json" hidden></label>
+        <input type="file" id="store-file" accept="application/json,.json" hidden>
         <button type="button" class="tbtn" data-app="sample">サンプルを読み込む</button>
         <button type="button" class="tbtn" data-app="reset">空で始める</button>
         <button type="button" class="tbtn" data-app="guide">ガイドをすべて開く</button>
@@ -32,6 +33,7 @@
     <div class="notice" id="storage-notice" hidden>自動保存が無効です（プライベートモード等）。「書き出し」でファイルに保存してください。</div>
   </div>
 </header>
+<nav class="storebar wrap" id="storebar" aria-label="店舗切替"></nav>
 <nav class="stepper wrap" id="stepper" aria-label="ステップ">
   <button type="button" data-step="1" class="active"><span class="no">1</span>経営数値</button>
   <button type="button" data-step="2"><span class="no">2</span>間口カテゴリ</button>
@@ -66,6 +68,9 @@
 <script src="js/ui-diagnosis.js"></script>
 <script src="js/ui-plan.js"></script>
 <script src="js/ui-report.js"></script>
+<script src="js/ui-company.js"></script>
+<script src="js/ui-company-diag.js"></script>
+<script src="js/ui-company-plan.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

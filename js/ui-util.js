@@ -18,15 +18,15 @@ Sim.ui = Sim.ui || {};
     return v;
   }
   function bindPanel(el, api, actions) {
-    if (el.dataset.bound) { el._actions = actions; return; }
-    el.dataset.bound = '1'; el._actions = actions;
+    if (el.dataset.bound) { el._actions = actions; el._api = api; return; }
+    el.dataset.bound = '1'; el._actions = actions; el._api = api;
     el.addEventListener('input', e => {
       const t = e.target.closest('[data-path]'); if (!t || t.type === 'checkbox') return;
-      const v = parseValue(t); api.update(s => setPath(s, t.dataset.path, v));
+      const v = parseValue(t); el._api.update(s => setPath(s, t.dataset.path, v));
     });
     el.addEventListener('change', e => {
       const t = e.target.closest('[data-path]'); if (!t || t.type !== 'checkbox') return;
-      const v = parseValue(t); api.update(s => setPath(s, t.dataset.path, v));
+      const v = parseValue(t); el._api.update(s => setPath(s, t.dataset.path, v));
     });
     el.addEventListener('click', e => {
       const t = e.target.closest('[data-action]'); if (!t || !el.contains(t)) return;

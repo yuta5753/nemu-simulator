@@ -177,5 +177,95 @@ window.Sim = window.Sim || {};
     return { required, current: m.revenue, gap: required - m.revenue, existingForecast,
       newTarget: existingForecast != null ? Math.max(0, required - existingForecast) : null, grossMarginPct: m.grossMarginPct, fixedCosts: m.fixedCosts };
   }
-  Sim.calc = { STANDARD_DELTAS, applied, ltv, category, store, reverse, reachRate, evenSplit, crmTargets, effectiveCogsRate, mgmtCore, mgmt, consistency, mgmtLeverage, requiredRevenue };
+  function sumOf(list, get) { let s = null, n = 0; list.forEach(x => { const v = get(x); if (typeof v === 'number' && !isNaN(v)) { s = (s || 0) + v; n++; } }); return { s, n }; }
+  function mergeByName(lists, combine) {
+    const map = new Map(); const order = [];
+    lists.forEach(rows => (rows || []).forEach(r => { const key = String(r.name == null ? '' : r.name).trim(); if (!key) return; if (!map.has(key)) { map.set(key, []); order.push(key); } map.get(key).push(r); }));
+    return order.map((key, i) => combine(key, map.get(key), i));
+  }
+  function wavg(rows, valKey, wKey) { let s = 0, w = 0; rows.forEach(r => { if (r[valKey] != null && r[wKey] > 0) { s += r[valKey] * r[wKey]; w += r[wKey]; } }); return w > 0 ? s / w : null; }
+  function mergeMgmt(list) {
+    const total = list.length; const anchored = list.filter(x => typeof x.revenue === 'number' && !isNaN(x.revenue)); const A = anchored.length;
+    const m = Sim.state.emptyMgmt(); const coverage = {}; const cov = (k, n) => { coverage[k] = { n, total }; };
+    const sumIfComplete = (get) => { const r = sumOf(anchored, get); return { s: r.n === A ? r.s : null, n: r.n }; };
+    ['revenue', 'buyers', 'newBuyers', 'newRevenue', 'activeCustomers', 'dormant', 'inventory'].forEach(k => { const r = sumIfComplete(x => nn(x[k])); m[k] = r.s; cov(k, r.n); });
+    m.itemsPerBuyer = wavg(anchored, 'itemsPerBuyer', 'buyers');
+    const V = ['once', 'twice', 'threePlus']; V.forEach(k => { const r = sumIfComplete(x => nn(x.visits && x.visits[k])); m.visits[k] = r.s; }); cov('visits', anchored.filter(x => x.visits && V.every(k => x.visits[k] != null)).length);
+    const F = ['reservations', 'visits', 'deals']; F.forEach(k => { const r = sumIfComplete(x => nn(x.funnel && x.funnel[k])); m.funnel[k] = r.s; }); cov('funnel', anchored.filter(x => x.funnel && F.every(k => x.funnel[k] != null)).length);
+    ['cogs', 'labor', 'rent', 'ads', 'other'].forEach(k => { const r = sumIfComplete(x => nn(x.costs && x.costs[k])); m.costs[k] = r.s; cov('costs.' + k, r.n); });
+    m.products = mergeByName(anchored.map(x => x.products), (name, rows, i) => Sim.state.newProductRow({ id: 'agg_p' + i, name, sales: sumOf(rows, r => nn(r.sales)).s, grossMarginPct: wavg(rows, 'grossMarginPct', 'sales') }));
+    m.replacement = mergeByName(anchored.map(x => x.replacement), (name, rows, i) => Sim.state.newReplacementRow({ id: 'agg_r' + i, name, cycleYears: wavg(rows, 'cycleYears', 'pastBuyers'), pastBuyers: sumOf(rows, r => nn(r.pastBuyers)).s }));
+    const prevs = anchored.map(x => x.prev); m.prev = (A > 0 && prevs.every(p => p && typeof p.revenue === 'number' && !isNaN(p.revenue))) ? mergeMgmt(prevs).mgmt : null;
+    return { mgmt: m, coverage };
+  }
+  function companyMgmt(company) {
+    const stores = (company && company.stores) || []; const merged = mergeMgmt(stores.map(s => s.mgmt || {}));
+    const m = mgmtCore(merged.mgmt); m.available = m.revenue != null; m.prev = merged.mgmt.prev ? mgmtCore(merged.mgmt.prev) : null;
+    const sts = stores.map(s => store(s, 1)); const newTotal = sts.reduce((a, x) => a + x.newTotal, 0); const cohort = sts.reduce((a, x) => a + x.revenue, 0);
+    const weightedLtv = newTotal > 0 ? cohort / newTotal : 0; const cogsRate = m.grossMarginPct != null ? 1 - m.grossMarginPct : null;
+    m.channels = mergeByName(stores.map(s => s.channels), (name, rows, i) => {
+      const n = sumOf(rows, r => nn(r.newCustomers)).s || 0, cost = sumOf(rows, r => nn(r.cost)).s || 0; const cpa = n > 0 ? cost / n : null;
+      return { id: 'agg_ch' + i, name, newCustomers: n, cost, cpa, payback: (cpa != null && cpa > 0 && cogsRate != null) ? weightedLtv * (1 - cogsRate) / cpa : null };
+    });
+    const hqRaw = (company && company.company && company.company.hq) || {}; const hqKeys = ['labor', 'rent', 'ads', 'other']; const hq = {};
+    hqKeys.forEach(k => { hq[k] = nn(hqRaw[k]); }); const hqVals = hqKeys.map(k => hq[k]).filter(v => v != null); hq.total = hqVals.length ? hqVals.reduce((a, b) => a + b, 0) : null;
+    const operatingProfitAfterHq = m.operatingProfit != null ? m.operatingProfit - (hq.total || 0) : null;
+    const fixedCostsWithHq = m.fixedCosts != null ? m.fixedCosts + (hq.total || 0) : null;
+    const breakEvenWithHq = (fixedCostsWithHq != null && m.grossMarginPct > 0) ? fixedCostsWithHq / m.grossMarginPct : null;
+    return { available: m.available, m, coverage: merged.coverage, hq, operatingProfitAfterHq, fixedCostsWithHq, breakEvenWithHq,
+      safetyMarginWithHq: (breakEvenWithHq != null && m.revenue > 0) ? (m.revenue - breakEvenWithHq) / m.revenue : null, storeCount: stores.length };
+  }
+  function companyRequired(company) {
+    const cm = companyMgmt(company); const rp = company.company.plan.requiredProfit;
+    if (rp == null || cm.fixedCostsWithHq == null || !(cm.m.grossMarginPct > 0) || cm.m.revenue == null) return null;
+    const required = (cm.fixedCostsWithHq + rp) / cm.m.grossMarginPct; const g = company.company.plan.existingGrowthPct || 0;
+    const existingForecast = cm.m.existingRevenue != null ? cm.m.existingRevenue * (1 + g / 100) : null;
+    return { required, current: cm.m.revenue, gap: required - cm.m.revenue, existingForecast, newTarget: existingForecast != null ? Math.max(0, required - existingForecast) : null,
+      grossMarginPct: cm.m.grossMarginPct, fixedCosts: cm.fixedCostsWithHq, hqTotal: cm.hq.total };
+  }
+  const CMP_METRICS = [
+    { key: 'revenue', label: '総売上（年）', unit: 'yen', better: 'high', group: 'mgmt' },
+    { key: 'grossMarginPct', label: '粗利率', unit: 'pct', better: 'high', group: 'mgmt', bench: 'grossMarginPct' },
+    { key: 'operatingProfit', label: '営業利益（本部費前）', unit: 'yen', better: 'high', group: 'mgmt' },
+    { key: 'opMarginPct', label: '営業利益率', unit: 'pct', better: 'high', group: 'mgmt' },
+    { key: 'buyers', label: '購入客数', unit: 'num', better: 'high', group: 'mgmt' },
+    { key: 'newBuyers', label: '新規客数', unit: 'num', better: 'high', group: 'mgmt' },
+    { key: 'newShare', label: '新規客比率（売上）', unit: 'pct', better: 'high', group: 'mgmt' },
+    { key: 'aov', label: '客単価', unit: 'yen', better: 'high', group: 'mgmt' },
+    { key: 'repeatRate', label: 'リピート率', unit: 'pct', better: 'high', group: 'mgmt', bench: 'repeatRate' },
+    { key: 'safetyMargin', label: '安全余裕率', unit: 'pct', better: 'high', group: 'mgmt' },
+    { key: 'laborPct', label: '人件費率', unit: 'pct', better: 'low', group: 'mgmt', bench: 'laborPct' },
+    { key: 'rentPct', label: '家賃比率', unit: 'pct', better: 'low', group: 'mgmt', bench: 'rentPct' },
+    { key: 'adsPct', label: '広告費率', unit: 'pct', better: 'low', group: 'mgmt', bench: 'adsPct' },
+    { key: 'breakEven', label: '損益分岐点売上', unit: 'yen', better: 'low', group: 'mgmt' },
+    { key: 'categoryCount', label: '間口カテゴリ数', unit: 'num', better: null, group: 'entry' },
+    { key: 'newTotal', label: '新規獲得人数（間口合計）', unit: 'num', better: 'high', group: 'entry' },
+    { key: 'weightedLtv', label: '平均LTV（期間）', unit: 'yen', better: 'high', group: 'entry' },
+    { key: 'cohortRevenue', label: '期間累計売上', unit: 'yen', better: 'high', group: 'entry' },
+    { key: 'target', label: '間口の目標売上（期間）', unit: 'yen', better: null, group: 'entry' },
+    { key: 'scenarioRevenue', label: '今の配分での売上（期間）', unit: 'yen', better: null, group: 'entry' }
+  ];
+  function marks(values, better) {
+    const valid = values.filter(v => v.value != null); if (!better || valid.length < 2) return;
+    const nums = valid.map(v => v.value); const best = better === 'high' ? Math.max(...nums) : Math.min(...nums); const worst = better === 'high' ? Math.min(...nums) : Math.max(...nums);
+    valid.forEach(v => { v.mark = v.value === best ? '◎' : (v.value === worst ? '△' : '○'); });
+  }
+  function storeComparison(company, period) {
+    const stores = company.stores || []; const cm = companyMgmt(company); const b = (stores[0] && stores[0].benchmarks) || {};
+    const per = stores.map(s => {
+      const mg = mgmt(s); const st = store(s, period); const sc = s.plan.scenarios[s.plan.activeScenario] || s.plan.scenarios[0];
+      return Object.assign({}, mg, { categoryCount: s.categories.length, newTotal: st.newTotal, weightedLtv: st.newTotal > 0 ? st.weightedLtv : null,
+        cohortRevenue: st.revenue, target: s.plan.targetRevenue[period - 1], scenarioRevenue: store(s, period, sc && sc.levers).revenue });
+    });
+    const sum = k => sumOf(per, x => x[k]).s; const coNew = sum('newTotal'); const coCohort = sum('cohortRevenue');
+    const coEntry = { categoryCount: sum('categoryCount'), newTotal: coNew, weightedLtv: coNew > 0 ? coCohort / coNew : null, cohortRevenue: coCohort, target: sum('target'), scenarioRevenue: sum('scenarioRevenue') };
+    const metrics = CMP_METRICS.map(def => {
+      const values = per.map((p, i) => ({ storeId: stores[i].store.id, value: p[def.key] == null ? null : p[def.key], mark: null })); marks(values, def.better);
+      const co = def.group === 'entry' ? coEntry[def.key] : cm.m[def.key];
+      return Object.assign({}, def, { bench: (def.bench && b[def.bench] != null) ? b[def.bench] / 100 : null, values, company: co == null ? null : co });
+    });
+    return { stores: stores.map((s, i) => ({ id: s.store.id, name: Sim.state.storeLabel(company, i) })), metrics };
+  }
+  Sim.calc = { STANDARD_DELTAS, applied, ltv, category, store, reverse, reachRate, evenSplit, crmTargets, effectiveCogsRate, mgmtCore, mgmt, consistency, mgmtLeverage, requiredRevenue,
+    companyMgmt, companyRequired, storeComparison, CMP_METRICS };
 })();
