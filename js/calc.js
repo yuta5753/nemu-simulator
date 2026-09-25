@@ -195,7 +195,7 @@ window.Sim = window.Sim || {};
     ['cogs', 'labor', 'rent', 'ads', 'other'].forEach(k => { const r = sumIfComplete(x => nn(x.costs && x.costs[k])); m.costs[k] = r.s; cov('costs.' + k, r.n); });
     m.products = mergeByName(anchored.map(x => x.products), (name, rows, i) => Sim.state.newProductRow({ id: 'agg_p' + i, name, sales: sumOf(rows, r => nn(r.sales)).s, grossMarginPct: wavg(rows, 'grossMarginPct', 'sales') }));
     m.replacement = mergeByName(anchored.map(x => x.replacement), (name, rows, i) => Sim.state.newReplacementRow({ id: 'agg_r' + i, name, cycleYears: wavg(rows, 'cycleYears', 'pastBuyers'), pastBuyers: sumOf(rows, r => nn(r.pastBuyers)).s }));
-    const prevs = anchored.map(x => x.prev); m.prev = (A > 0 && prevs.every(Boolean)) ? mergeMgmt(prevs).mgmt : null;
+    const prevs = anchored.map(x => x.prev); m.prev = (A > 0 && prevs.every(p => p && typeof p.revenue === 'number' && !isNaN(p.revenue))) ? mergeMgmt(prevs).mgmt : null;
     return { mgmt: m, coverage };
   }
   function companyMgmt(company) {

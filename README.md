@@ -20,7 +20,7 @@
 
 ## 開発
 - 外部ライブラリなし。`index.html` をダブルクリックで動きます。
-- テスト: `node tests/run.js`（純関数のみ、110件全件通過）。画面は `tests/manual-checklist.md` で確認します。
+- テスト: `node tests/run.js`（純関数のみ、111件全件通過）。画面は `tests/manual-checklist.md` で確認します。
 - 表示は万円・ヶ月です（1万円未満は円、1億円以上は億円で表示します）。
 - 設計書: `docs/superpowers/specs/2026-09-23-simulator-v2-design.md`
 - 設計書（v2.1 経営数値）: `docs/superpowers/specs/2026-09-23-simulator-v2-1-management-design.md`

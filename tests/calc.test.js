@@ -187,3 +187,11 @@ test('storeComparison: 順位マーク（向き・同値・null）と全社列',
   eq(v[2].value, null); eq(v[2].mark, null); eq(v.map(x => x.mark), ['◎', '△', null]);
   eq(r3.metrics.find(m => m.key === 'opMarginPct').values.map(x => x.mark), ['◎', '△', null]); eq(r3.metrics.find(m => m.key === 'weightedLtv').values[2].value, null);
 });
+test('companyMgmt: 前期の欄が空のままの店舗があれば前期は合算しない', () => {
+  const c = Sim.state.createSample();
+  c.stores[0].mgmt.prev = Sim.state.normalizeMgmt({ revenue: 40000000, costs: { cogs: 21000000 } }, false);
+  c.stores[1].mgmt.prev = Sim.state.normalizeMgmt({}, false);
+  eq(C.companyMgmt(c).m.prev, null);
+  c.stores[1].mgmt.prev = Sim.state.normalizeMgmt({ revenue: 20000000, costs: { cogs: 9000000 } }, false);
+  eq(C.companyMgmt(c).m.prev.revenue, 60000000);
+});
