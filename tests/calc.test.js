@@ -77,3 +77,52 @@ test('crmTargets: 同日と後日を独立の仮定で1本に束ねる', () => {
   s.categories = [c]; const r = C.crmTargets(s, 1)[0];
   eq(r.addonRate, 60); eq(r.addonAov, Math.round(1100/0.6));
 });
+test('mgmt: サンプルの派生値', () => {
+  const m = C.mgmt(sample());
+  ok(m.available); eq(m.existingRevenue, 47100000); approx(m.aov, 68571.43, 0.01); approx(m.newShare, 0.01875, 1e-6);
+  eq(m.visitsTotal, 900); approx(m.repeatRate, 400 / 900, 1e-6); approx(m.visitFrequency, 700 / 900, 1e-6);
+  eq(m.grossProfit, 24000000); eq(m.grossMarginPct, 0.5); eq(m.laborPct, 0.2); eq(m.rentPct, 0.075); eq(m.adsPct, 0.0375); eq(m.otherPct, 0.0875);
+  eq(m.fixedCosts, 19200000); eq(m.operatingProfit, 4800000); eq(m.opMarginPct, 0.1); eq(m.breakEven, 38400000); eq(m.safetyMargin, 0.2); eq(m.inventoryTurnMonths, 3);
+  approx(m.products[0].share, 5 / 48, 1e-6); eq(m.products[0].contribution, 2750000); approx(m.products[0].contributionShare, 2750000 / 21650000, 1e-6);
+  eq(m.funnel.visitRate, 0.8); eq(m.funnel.dealRate, 0.75); eq(m.replacement[0].expectedBuyers, 40); eq(m.prev, null); eq(m.channels.length, 3);
+});
+test('mgmt: 部分入力は計算できるものだけ・未入力は null', () => {
+  const s = Sim.state.createEmpty(); s.mgmt.revenue = 10000000; const m = C.mgmt(s);
+  ok(m.available); eq(m.aov, null); eq(m.grossProfit, null); eq(m.breakEven, null); eq(m.repeatRate, null); eq(m.products, []); eq(m.inventoryTurnMonths, null);
+  eq(C.mgmt(Sim.state.createEmpty()).available, false);
+});
+test('mgmt: 粗利率が0以下なら損益分岐点・必要売上は null', () => {
+  const s = sample(); s.mgmt.costs.cogs = 50000000; s.plan.requiredProfit = 1000000; const m = C.mgmt(s);
+  ok(m.grossMarginPct < 0); eq(m.breakEven, null); eq(C.requiredRevenue(s), null);
+});
+test('mgmt: 前期があれば prev に同じ派生値', () => {
+  const s = sample(); s.mgmt.prev = Sim.state.normalizeMgmt({ revenue: 40000000, costs: { cogs: 21000000, labor: 9000000, rent: 3600000, ads: 1500000, other: 4000000 } }, false);
+  const m = C.mgmt(s); eq(m.prev.grossMarginPct, 0.475); eq(m.prev.operatingProfit, 900000);
+});
+test('effectiveCogsRate: 経営数値があれば仕入原価÷総売上、無ければ手入力', () => {
+  const s = sample(); eq(C.effectiveCogsRate(s), 50); s.mgmt.costs.cogs = 19200000; eq(C.effectiveCogsRate(s), 40);
+  approx(C.store(s, 3).grossProfit, 2376800 * 0.6, 0.01, 'store() も追随');
+  s.mgmt.revenue = null; eq(C.effectiveCogsRate(s), 50);
+});
+test('effectiveCogsRate: 仕入原価が総売上を上回ると100%を超える（現状の仕様として記録）', () => {
+  const s = sample(); s.mgmt.costs.cogs = 60000000; eq(C.effectiveCogsRate(s), 125);
+});
+test('mgmt: 負の入力は0として扱われる（fixedCosts・laborPctがクランプされる）', () => {
+  const s = sample(); s.mgmt.costs.labor = -1000000; const m = C.mgmt(s);
+  eq(m.fixedCosts, 19200000 - 9600000); eq(m.laborPct, 0);
+});
+test('consistency: ②の新規合計と初回来店売上を①と比べる', () => {
+  const c = C.consistency(sample()); eq(c.entryNewTotal, 100); eq(c.entryNewRevenue, 840000); eq(c.newBuyersRatio, 1); approx(c.newRevenueRatio, 0.9333, 0.001);
+  const s = sample(); s.mgmt.newBuyers = null; eq(C.consistency(s).newBuyersRatio, null);
+});
+test('mgmtLeverage: 営業利益への4本のインパクト', () => {
+  const lv = C.mgmtLeverage(sample()); eq(lv.base, 4800000);
+  const d = Object.fromEntries(lv.items.map(i => [i.key, i.delta])); eq(d.revenue, 2400000); eq(d.gm, 480000); eq(d.labor, 480000); eq(d.ads, 180000); eq(lv.top.key, 'revenue');
+  eq(C.mgmtLeverage(Sim.state.createEmpty()), null);
+});
+test('requiredRevenue: 必要利益→必要売上→間口の目標', () => {
+  const s = sample(); s.plan.requiredProfit = 6000000; const r = C.requiredRevenue(s);
+  eq(r.required, 50400000); eq(r.gap, 2400000); eq(r.existingForecast, 47100000); eq(r.newTarget, 3300000);
+  s.plan.existingGrowthPct = 10; eq(C.requiredRevenue(s).newTarget, 0, '既存で足りれば0（負にしない）');
+  s.plan.requiredProfit = null; eq(C.requiredRevenue(s), null);
+});

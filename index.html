@@ -14,7 +14,7 @@
     <div class="head-row">
       <div>
         <h1 id="head-title">店舗 売上シミュレーター</h1>
-        <p id="head-sub">現状の数字を入れて診断し、目標とレバー配分まで設計します。入力は自動保存されます。</p>
+        <p id="head-sub">経営数値と間口カテゴリを入れて診断し、目標とレバー配分まで設計します。入力は自動保存されます。</p>
       </div>
       <div class="head-tools">
         <button type="button" class="tbtn" data-app="export">書き出し（JSON）</button>
@@ -25,32 +25,34 @@
       </div>
     </div>
     <div class="periodbar" id="periodbar">
-      <button type="button" data-p="1">1年で見る</button>
-      <button type="button" data-p="2">2年で見る</button>
-      <button type="button" data-p="3" class="active">3年で見る</button>
+      <button type="button" data-p="1">12ヶ月で見る</button>
+      <button type="button" data-p="2">24ヶ月で見る</button>
+      <button type="button" data-p="3" class="active">36ヶ月で見る</button>
     </div>
     <div class="notice" id="storage-notice" hidden>自動保存が無効です（プライベートモード等）。「書き出し」でファイルに保存してください。</div>
   </div>
 </header>
 <nav class="stepper wrap" id="stepper" aria-label="ステップ">
-  <button type="button" data-step="1" class="active"><span class="no">1</span>現状入力</button>
-  <button type="button" data-step="2"><span class="no">2</span>診断</button>
-  <button type="button" data-step="3"><span class="no">3</span>目標と戦略</button>
-  <button type="button" data-step="4"><span class="no">4</span>レポート</button>
+  <button type="button" data-step="1" class="active"><span class="no">1</span>経営数値</button>
+  <button type="button" data-step="2"><span class="no">2</span>間口カテゴリ</button>
+  <button type="button" data-step="3"><span class="no">3</span>診断</button>
+  <button type="button" data-step="4"><span class="no">4</span>目標と戦略</button>
+  <button type="button" data-step="5"><span class="no">5</span>レポート</button>
 </nav>
 <main class="wrap">
   <section class="step-panel" id="panel-1" data-step="1"></section>
   <section class="step-panel" id="panel-2" data-step="2" hidden></section>
   <section class="step-panel" id="panel-3" data-step="3" hidden></section>
   <section class="step-panel" id="panel-4" data-step="4" hidden></section>
+  <section class="step-panel" id="panel-5" data-step="5" hidden></section>
   <div class="footnote">すべて試算です。実数値を入れるほど精度が上がります。ブラウザ内の自動保存は同じ端末・同じブラウザでしか残りません。持ち回るときは「書き出し」をお使いください。</div>
 </main>
 <div class="floatp hide" id="floatp">
   <div class="fpl">期間切替</div>
   <div class="fprow">
-    <button type="button" data-p="1">1年</button>
-    <button type="button" data-p="2">2年</button>
-    <button type="button" data-p="3" class="active">3年</button>
+    <button type="button" data-p="1">12ヶ月</button>
+    <button type="button" data-p="2">24ヶ月</button>
+    <button type="button" data-p="3" class="active">36ヶ月</button>
   </div>
 </div>
 <script src="js/state.js"></script>
@@ -59,6 +61,7 @@
 <script src="js/paste.js"></script>
 <script src="js/tactics.js"></script>
 <script src="js/ui-util.js"></script>
+<script src="js/ui-mgmt.js"></script>
 <script src="js/ui-input.js"></script>
 <script src="js/ui-diagnosis.js"></script>
 <script src="js/ui-plan.js"></script>

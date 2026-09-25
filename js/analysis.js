@@ -5,7 +5,7 @@ window.Sim = window.Sim || {};
   const LEVER_LABELS = { newPct: '新規獲得人数', sameDayPt: '同日追加率', laterPt: '後日追加率', aovPct: '追加単価', entryPricePct: '間口単価' };
   const QUADRANT_LABELS = { core: '主力（伸ばす）', entryOnly: '入口止まり（育てる）', hidden: '隠れた優良間口（集客を寄せる）', review: '見直す' };
   const median = arr => { const a = arr.slice().sort((x, y) => x - y); const n = a.length; if (!n) return 0; return n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2; };
-  const yen = n => '¥' + Math.round(n).toLocaleString('ja-JP');
+  const yen = n => Sim.ui.util.yen(n);
 
   function portfolio(state, period) {
     const cats = Sim.calc.store(state, period).categories;
@@ -114,5 +114,64 @@ window.Sim = window.Sim || {};
     if (!out.length) out.push('間口カテゴリを入力すると診断コメントが出ます。');
     return out;
   }
-  Sim.analysis = { MIN_BASE, LEVER_LABELS, QUADRANT_LABELS, portfolio, leverage, weakness, timing, checks, comments };
+  const pctOf = v => (v == null ? null : v / 100);
+  const pct1 = v => (v == null ? '—' : (Math.round(v * 1000) / 10) + '%');
+  function mgmtHealth(state) {
+    const m = Sim.calc.mgmt(state); if (!m.available) return { available: false };
+    const b = state.benchmarks || {}; const p = m.prev;
+    const hasBench = b.grossMarginPct != null || b.laborPct != null || b.rentPct != null || b.adsPct != null || b.repeatRate != null;
+    const mode = hasBench ? 'benchmark' : (p ? 'prev' : 'none');
+    const mk = (key, label, value, prev, bench) => ({ key, label, value, prev, bench,
+      diffPrev: (value != null && prev != null) ? value - prev : null, diffBench: (value != null && bench != null) ? value - bench : null });
+    const ratios = [
+      mk('laborPct', '人件費率', m.laborPct, p && p.laborPct, pctOf(b.laborPct)),
+      mk('rentPct', '家賃比率', m.rentPct, p && p.rentPct, pctOf(b.rentPct)),
+      mk('adsPct', '広告費率', m.adsPct, p && p.adsPct, pctOf(b.adsPct)),
+      mk('otherPct', 'その他経費率', m.otherPct, p && p.otherPct, null)
+    ];
+    const gross = mk('grossMarginPct', '粗利率', m.grossMarginPct, p && p.grossMarginPct, pctOf(b.grossMarginPct));
+    const repeat = mk('repeatRate', 'リピート率', m.repeatRate, p && p.repeatRate, pctOf(b.repeatRate));
+    const lowContribution = m.products.filter(x => x.share != null && x.contributionShare != null && x.contributionShare < x.share * 0.9).map(x => x.name);
+    return { available: true, m, mode, ratios, gross, repeat, lowContribution };
+  }
+  function consistencyCheck(state) {
+    const c = Sim.calc.consistency(state); const flags = [];
+    const chk = (ratio, label) => { if (ratio == null) return; if (ratio < 0.8 || ratio > 1.2) flags.push(`${label}：②の合計が①の${Math.round(ratio * 100)}%です。間口カテゴリの分け方か新規の数え方にズレがある可能性があります`); };
+    chk(c.newBuyersRatio, '新規人数'); chk(c.newRevenueRatio, '新規客売上');
+    return Object.assign({}, c, { flags });
+  }
+  function mgmtChecks(state) {
+    const m = state.mgmt || {}; const w = []; const has = v => v != null;
+    if (has(m.revenue) && has(m.newRevenue) && m.newRevenue > m.revenue) w.push({ code: 'new_revenue_gt_total', message: '新規客売上が総売上を超えています。どちらかの数字をご確認ください' });
+    if (has(m.buyers) && has(m.newBuyers) && m.newBuyers > m.buyers) w.push({ code: 'new_buyers_gt_total', message: '新規客数が購入客数を超えています。どちらかの数字をご確認ください' });
+    const v = m.visits || {}; const vs = [v.once, v.twice, v.threePlus];
+    if (vs.every(has) && has(m.activeCustomers) && vs[0] + vs[1] + vs[2] > m.activeCustomers) w.push({ code: 'visits_gt_active', message: '来店回数別の客数の合計がアクティブ顧客数を超えています。数え方をご確認ください' });
+    (m.products || []).forEach(x => { if (has(x.grossMarginPct) && (x.grossMarginPct < 0 || x.grossMarginPct > 100)) w.push({ code: 'gm_range', message: `${x.name || '商品'}：粗利率は0〜100%の範囲で入力します` }); });
+    const negs = []; const scan = (obj, prefix) => Object.keys(obj || {}).forEach(k => { const val = obj[k]; if (typeof val === 'number' && val < 0) negs.push(prefix + k); });
+    scan({ revenue: m.revenue, buyers: m.buyers, newBuyers: m.newBuyers, newRevenue: m.newRevenue, activeCustomers: m.activeCustomers, dormant: m.dormant, inventory: m.inventory }, ''); scan(m.costs, 'costs.'); scan(m.visits, 'visits.'); scan(m.funnel, 'funnel.');
+    if (negs.length) w.push({ code: 'negative', message: '経営数値の金額・人数は0以上で入力します（計算では0として扱っています）' });
+    return w;
+  }
+  function mgmtComments(state) {
+    const h = mgmtHealth(state); if (!h.available) return ['①経営数値を入れると経営の健康度が出ます。'];
+    const m = h.m; const out = []; const ref = (r, unitLabel) => {
+      if (h.mode === 'benchmark' && r.diffBench != null) return `（目安${pct1(r.bench)}との差${(r.diffBench >= 0 ? '+' : '')}${pct1(r.diffBench)}）`;
+      if (h.mode === 'prev' && r.diffPrev != null) return `（前期${pct1(r.prev)}から${(r.diffPrev >= 0 ? '+' : '')}${pct1(r.diffPrev)}）`;
+      return '';
+    };
+    if (m.grossMarginPct != null) out.push(`粗利率${pct1(m.grossMarginPct)}${ref(h.gross)}。営業利益は${m.operatingProfit == null ? '費用を入れると出ます' : yen(m.operatingProfit) + '（営業利益率' + pct1(m.opMarginPct) + '）'}。`);
+    if (m.breakEven != null) out.push(`損益分岐点売上は${yen(m.breakEven)}で、安全余裕率は${pct1(m.safetyMargin)}です。`);
+    const key = h.mode === 'benchmark' ? 'diffBench' : 'diffPrev';
+    const up = h.ratios.filter(r => r.value != null && r[key] != null && r[key] > 0).sort((a, b) => b[key] - a[key])[0];
+    if (up) out.push(`費用比率で${h.mode === 'benchmark' ? '目安' : '前期'}より上振れが大きいのは${up.label}${pct1(up.value)}${ref(up)}です。`);
+    else h.ratios.filter(r => r.value != null).forEach(r => out.push(`${r.label}は${pct1(r.value)}です。`));
+    if (m.newShare != null) out.push(`売上の${pct1(1 - m.newShare)}が既存客、${pct1(m.newShare)}が新規客によるものです。${(h.repeat.bench != null || h.repeat.prev != null) ? '' : 'リピート率の目安値か前期を入れると、この構成の評価が出ます。'}`);
+    if (m.repeatRate != null) out.push(`来店回数を把握している${m.visitsTotal}人のうち、2回以上来店した方は${pct1(m.repeatRate)}${ref(h.repeat)}です。`);
+    if (h.lowContribution.length) out.push(`${h.lowContribution.join('・')}は売上シェアに比べて粗利貢献が小さく、値付けか仕入の見直し余地がある可能性があります。`);
+    const lv = Sim.calc.mgmtLeverage(state); if (lv) out.push(`営業利益に最も効くのは「${lv.top.label}」で、${yen(lv.top.delta)}の増加になる試算です。`);
+    consistencyCheck(state).flags.forEach(f => out.push(f + '。'));
+    if (!out.length) out.push('費用の構造や顧客の構成を入れると、ここにコメントが出ます。');
+    return out;
+  }
+  Sim.analysis = { MIN_BASE, LEVER_LABELS, QUADRANT_LABELS, portfolio, leverage, weakness, timing, checks, comments, mgmtHealth, consistencyCheck, mgmtChecks, mgmtComments };
 })();

@@ -1,6 +1,6 @@
 window.Sim = window.Sim || {};
 (function () {
-  const SCHEMA_VERSION = 2;
+  const SCHEMA_VERSION = 3;
   const STORAGE_KEY = 'storeSim:v2';
   let seq = 0;
   const uid = (prefix) => prefix + '_' + Date.now().toString(36) + '_' + (++seq);
@@ -12,6 +12,37 @@ window.Sim = window.Sim || {};
   function emptyPrev() {
     return { entryPrice: null, newCustomers: null, sameDay: { rate: null, aov: null },
       later: [{ rate: null, aov: null }, { rate: null, aov: null }, { rate: null, aov: null }], daysToAddon: null };
+  }
+  function newProductRow(o) {
+    o = o || {};
+    return { id: safeId(o.id, 'p'), name: o.name == null ? '' : String(o.name), sales: optNum(o.sales), grossMarginPct: optNum(o.grossMarginPct) };
+  }
+  function newReplacementRow(o) {
+    o = o || {};
+    return { id: safeId(o.id, 'r'), name: o.name == null ? '' : String(o.name), cycleYears: optNum(o.cycleYears), pastBuyers: optNum(o.pastBuyers) };
+  }
+  function emptyMgmt() {
+    return {
+      revenue: null, buyers: null, newBuyers: null, newRevenue: null, itemsPerBuyer: null,
+      activeCustomers: null, visits: { once: null, twice: null, threePlus: null }, dormant: null,
+      products: [], inventory: null,
+      costs: { cogs: null, labor: null, rent: null, ads: null, other: null },
+      funnel: { reservations: null, visits: null, deals: null },
+      replacement: [], prev: null
+    };
+  }
+  function normalizeMgmt(raw, allowPrev) {
+    const m = emptyMgmt(); const r = (raw && typeof raw === 'object') ? raw : {};
+    ['revenue', 'buyers', 'newBuyers', 'newRevenue', 'itemsPerBuyer', 'activeCustomers', 'dormant', 'inventory'].forEach(k => { m[k] = optNum(r[k]); });
+    const v = r.visits || {}; m.visits = { once: optNum(v.once), twice: optNum(v.twice), threePlus: optNum(v.threePlus) };
+    const c = r.costs || {}; m.costs = { cogs: optNum(c.cogs), labor: optNum(c.labor), rent: optNum(c.rent), ads: optNum(c.ads), other: optNum(c.other) };
+    const f = r.funnel || {}; m.funnel = { reservations: optNum(f.reservations), visits: optNum(f.visits), deals: optNum(f.deals) };
+    m.products = Array.isArray(r.products) ? r.products.map(p => newProductRow(p)) : [];
+    m.replacement = Array.isArray(r.replacement) ? r.replacement.map(p => newReplacementRow(p)) : [];
+    dedupeIds(m.products, 'p'); dedupeIds(m.replacement, 'r');
+    if (allowPrev && r.prev && typeof r.prev === 'object') { m.prev = normalizeMgmt(r.prev, false); delete m.prev.prev; }
+    else m.prev = null;
+    return m;
   }
   function normalizePrev(p) {
     const e = emptyPrev(); if (!p || typeof p !== 'object') return e;
@@ -60,9 +91,11 @@ window.Sim = window.Sim || {};
     return {
       version: SCHEMA_VERSION,
       store: { name: '', fiscalLabel: '', cogsRate: 50, fixedCostMonthly: 0, period: 3 },
-      benchmarks: { sameDayRate: null, laterRate: [null, null, null], laterAov: [null, null, null], daysToAddon: null },
+      benchmarks: { sameDayRate: null, laterRate: [null, null, null], laterAov: [null, null, null], daysToAddon: null,
+        grossMarginPct: null, laborPct: null, rentPct: null, adsPct: null, repeatRate: null },
       categories: [], channels: [],
-      plan: { targetRevenue: [null, null, null], activeScenario: 0, scenarios: [newScenario('標準', [])] },
+      mgmt: emptyMgmt(),
+      plan: { targetRevenue: [null, null, null], activeScenario: 0, scenarios: [newScenario('標準', [])], requiredProfit: null, existingGrowthPct: 0 },
       meta: { createdAt: now, updatedAt: now }
     };
   }
@@ -88,6 +121,17 @@ window.Sim = window.Sim || {};
     s.categories[0].nextProducts = 'マットレス・枕カバー'; s.categories[0].daysToAddon = 45;
     s.categories[1].nextProducts = '掛け布団・枕'; s.categories[1].daysToAddon = 90;
     s.plan.scenarios = [newScenario('保守', s.categories), newScenario('標準', s.categories), newScenario('強気', s.categories)];
+    s.channels = [newChannel({ name: 'Google広告', newCustomers: 40, cost: 900000 }), newChannel({ name: '紹介・口コミ', newCustomers: 35, cost: 0 }), newChannel({ name: 'チラシ', newCustomers: 25, cost: 300000 })];
+    s.mgmt = normalizeMgmt({
+      revenue: 48000000, buyers: 700, newBuyers: 100, newRevenue: 900000, itemsPerBuyer: 1.6,
+      activeCustomers: 900, visits: { once: 500, twice: 250, threePlus: 150 }, dormant: 300,
+      products: [{ name: '枕（フィッティング）', sales: 5000000, grossMarginPct: 55 }, { name: '敷きもの・カバー類', sales: 12000000, grossMarginPct: 45 },
+        { name: 'マットレス', sales: 20000000, grossMarginPct: 40 }, { name: 'その他', sales: 11000000, grossMarginPct: 50 }],
+      inventory: 6000000,
+      costs: { cogs: 24000000, labor: 9600000, rent: 3600000, ads: 1800000, other: 4200000 },
+      funnel: { reservations: 300, visits: 240, deals: 180 },
+      replacement: [{ name: 'マットレス', cycleYears: 8, pastBuyers: 320 }]
+    }, true);
     s.plan.activeScenario = 1;
     return s;
   }
@@ -102,11 +146,14 @@ window.Sim = window.Sim || {};
     s.store = { name: st.name == null ? '' : String(st.name), fiscalLabel: st.fiscalLabel == null ? '' : String(st.fiscalLabel),
       cogsRate: num(st.cogsRate, 50), fixedCostMonthly: num(st.fixedCostMonthly, 0), period: [1, 2, 3].includes(+st.period) ? +st.period : 3 };
     s.benchmarks = { sameDayRate: optNum(b.sameDayRate), laterRate: [0, 1, 2].map(i => optNum(b.laterRate && b.laterRate[i])),
-      laterAov: [0, 1, 2].map(i => optNum(b.laterAov && b.laterAov[i])), daysToAddon: optNum(b.daysToAddon) };
+      laterAov: [0, 1, 2].map(i => optNum(b.laterAov && b.laterAov[i])), daysToAddon: optNum(b.daysToAddon),
+      grossMarginPct: optNum(b.grossMarginPct), laborPct: optNum(b.laborPct), rentPct: optNum(b.rentPct), adsPct: optNum(b.adsPct), repeatRate: optNum(b.repeatRate) };
     s.categories = Array.isArray(obj.categories) ? obj.categories.map(c => newCategory(c)) : [];
     s.channels = Array.isArray(obj.channels) ? obj.channels.map(c => newChannel(c)) : [];
     dedupeIds(s.categories, 'c'); dedupeIds(s.channels, 'ch');
     s.plan.targetRevenue = [0, 1, 2].map(i => optNum(p.targetRevenue && p.targetRevenue[i]));
+    s.plan.requiredProfit = optNum(p.requiredProfit); s.plan.existingGrowthPct = num(p.existingGrowthPct, 0);
+    s.mgmt = normalizeMgmt(obj.mgmt, true);
     const scs = (Array.isArray(p.scenarios) && p.scenarios.length) ? p.scenarios.slice(0, 3) : [{ name: '標準' }];
     s.plan.scenarios = scs.map(sc => newScenario(sc.name, s.categories, sc));
     s.plan.activeScenario = Math.min(Math.max(0, Math.round(num(p.activeScenario, 0))), s.plan.scenarios.length - 1);
@@ -139,5 +186,6 @@ window.Sim = window.Sim || {};
     return n + '_' + d + '.json';
   }
   Sim.state = { SCHEMA_VERSION, STORAGE_KEY, createEmpty, createSample, newCategory, newChannel, newScenario, emptyLevers, emptyPrev,
+    emptyMgmt, normalizeMgmt, newProductRow, newReplacementRow,
     migrateV1, normalize, syncScenarios, serialize, parse, save, load, exportFilename };
 })();

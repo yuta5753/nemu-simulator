@@ -25,7 +25,7 @@ window.Sim = window.Sim || {};
       addonPerCustomer: addon, entryRevenue: a.newN * a.entryPrice, addonRevenue: a.newN * addon, revenue: a.newN * v.ltv };
   }
   function store(state, period, scenarioLevers) {
-    const cogs = (state.store.cogsRate || 0) / 100;
+    const cogs = effectiveCogsRate(state) / 100;
     const cats = state.categories.map(c => category(c, period, scenarioLevers && scenarioLevers[c.id]));
     const revenue = cats.reduce((s, c) => s + c.revenue, 0); const newTotal = cats.reduce((s, c) => s + c.newN, 0);
     cats.forEach(c => { c.share = revenue > 0 ? c.revenue / revenue : 0; });
@@ -99,5 +99,83 @@ window.Sim = window.Sim || {};
         addonRate: Math.round(rate * 1000) / 10, addonAov: rate > 0 ? Math.round(expected / rate) : 0 };
     });
   }
-  Sim.calc = { STANDARD_DELTAS, applied, ltv, category, store, reverse, reachRate, evenSplit, crmTargets };
+  function effectiveCogsRate(state) {
+    const m = state.mgmt;
+    if (m && m.revenue > 0 && m.costs && m.costs.cogs != null) return Math.max(0, m.costs.cogs) / m.revenue * 100;
+    return state.store.cogsRate || 0;
+  }
+  const nz = v => (v == null || isNaN(v)) ? null : v;
+  const nn = v => { const x = nz(v); return x == null ? null : Math.max(0, x); };
+  const div = (a, b) => (a == null || b == null || !(b > 0)) ? null : a / b;
+  function mgmtCore(m) {
+    m = m || {};
+    const revenue = nn(m.revenue), buyers = nn(m.buyers), newBuyers = nn(m.newBuyers), newRevenue = nn(m.newRevenue);
+    const existingRevenue = (revenue != null && newRevenue != null) ? revenue - newRevenue : null;
+    const v = m.visits || {}; const vs = [nn(v.once), nn(v.twice), nn(v.threePlus)];
+    const visitsTotal = vs.every(x => x != null) ? vs[0] + vs[1] + vs[2] : null;
+    const c = m.costs || {}; const cogs = nn(c.cogs);
+    const grossProfit = (revenue != null && cogs != null) ? revenue - cogs : null; const grossMarginPct = div(grossProfit, revenue);
+    const costKeys = ['labor', 'rent', 'ads', 'other'];
+    const costsClamped = { labor: nn(c.labor), rent: nn(c.rent), ads: nn(c.ads), other: nn(c.other) };
+    const fixedCosts = costKeys.every(k => costsClamped[k] != null) ? costKeys.reduce((s, k) => s + costsClamped[k], 0) : null;
+    const operatingProfit = (grossProfit != null && fixedCosts != null) ? grossProfit - fixedCosts : null;
+    const breakEven = (fixedCosts != null && grossMarginPct > 0) ? fixedCosts / grossMarginPct : null;
+    const prods = (m.products || []); const salesSum = prods.reduce((s, p) => s + (nn(p.sales) || 0), 0);
+    const products = prods.map(p => {
+      const sales = nn(p.sales), gm = nz(p.grossMarginPct);
+      return { id: p.id, name: p.name, sales, grossMarginPct: gm, share: div(sales, salesSum), contribution: (sales != null && gm != null) ? sales * gm / 100 : null, contributionShare: null };
+    });
+    const contribSum = products.reduce((s, p) => s + (p.contribution || 0), 0);
+    products.forEach(p => { p.contributionShare = (p.contribution != null && contribSum > 0) ? p.contribution / contribSum : null; });
+    const f = m.funnel || {};
+    const funnelClamped = { reservations: nn(f.reservations), visits: nn(f.visits), deals: nn(f.deals) };
+    const funnel = { reservations: funnelClamped.reservations, visits: funnelClamped.visits, deals: funnelClamped.deals,
+      visitRate: div(funnelClamped.visits, funnelClamped.reservations), dealRate: div(funnelClamped.deals, funnelClamped.visits) };
+    const replacement = (m.replacement || []).map(r => {
+      const cycleYears = nz(r.cycleYears), pastBuyers = nn(r.pastBuyers);
+      return { id: r.id, name: r.name, cycleYears, pastBuyers, expectedBuyers: (cycleYears > 0 && pastBuyers != null) ? pastBuyers / cycleYears : null };
+    });
+    const inventory = nn(m.inventory), activeCustomers = nn(m.activeCustomers);
+    return {
+      revenue, buyers, newBuyers, newRevenue, itemsPerBuyer: nn(m.itemsPerBuyer), existingRevenue, aov: div(revenue, buyers), newShare: div(newRevenue, revenue),
+      activeCustomers, visits: { once: vs[0], twice: vs[1], threePlus: vs[2] }, visitsTotal,
+      repeatRate: visitsTotal > 0 ? (vs[1] + vs[2]) / visitsTotal : null, visitFrequency: div(buyers, activeCustomers), dormant: nn(m.dormant),
+      cogs, grossProfit, grossMarginPct, costs: costsClamped,
+      laborPct: div(costsClamped.labor, revenue), rentPct: div(costsClamped.rent, revenue), adsPct: div(costsClamped.ads, revenue), otherPct: div(costsClamped.other, revenue),
+      fixedCosts, operatingProfit, opMarginPct: div(operatingProfit, revenue), breakEven, safetyMargin: (breakEven != null && revenue > 0) ? (revenue - breakEven) / revenue : null,
+      inventory, inventoryTurnMonths: (inventory != null && cogs > 0) ? inventory / (cogs / 12) : null,
+      products, funnel, replacement
+    };
+  }
+  function mgmt(state) {
+    const m = state.mgmt || {}; const cur = mgmtCore(m);
+    cur.available = cur.revenue != null; cur.prev = m.prev ? mgmtCore(m.prev) : null; cur.channels = store(state, 1).channels;
+    return cur;
+  }
+  function consistency(state) {
+    const m = mgmt(state);
+    const entryNewTotal = state.categories.reduce((s, c) => s + Math.max(0, c.newCustomers), 0);
+    const entryNewRevenue = state.categories.reduce((s, c) => { const a = applied(c, 1); return s + a.newN * (a.entryPrice + a.sameRate * a.sameAov); }, 0);
+    return { entryNewTotal, entryNewRevenue, newBuyers: m.newBuyers, newRevenue: m.newRevenue,
+      newBuyersRatio: div(entryNewTotal, m.newBuyers), newRevenueRatio: div(entryNewRevenue, m.newRevenue) };
+  }
+  function mgmtLeverage(state) {
+    const m = mgmt(state); if (m.operatingProfit == null || m.grossMarginPct == null) return null;
+    const items = [
+      { key: 'revenue', label: '売上 +10%', delta: m.revenue * 0.10 * m.grossMarginPct },
+      { key: 'gm', label: '粗利率 +1pt', delta: m.revenue * 0.01 },
+      { key: 'labor', label: '人件費 −5%', delta: (m.costs.labor || 0) * 0.05 },
+      { key: 'ads', label: '広告費 −10%', delta: (m.costs.ads || 0) * 0.10 }
+    ].sort((a, b) => b.delta - a.delta);
+    return { base: m.operatingProfit, items, top: items[0] };
+  }
+  function requiredRevenue(state) {
+    const m = mgmt(state); const rp = state.plan.requiredProfit;
+    if (rp == null || m.fixedCosts == null || !(m.grossMarginPct > 0) || m.revenue == null) return null;
+    const required = (m.fixedCosts + rp) / m.grossMarginPct; const g = state.plan.existingGrowthPct || 0;
+    const existingForecast = m.existingRevenue != null ? m.existingRevenue * (1 + g / 100) : null;
+    return { required, current: m.revenue, gap: required - m.revenue, existingForecast,
+      newTarget: existingForecast != null ? Math.max(0, required - existingForecast) : null, grossMarginPct: m.grossMarginPct, fixedCosts: m.fixedCosts };
+  }
+  Sim.calc = { STANDARD_DELTAS, applied, ltv, category, store, reverse, reachRate, evenSplit, crmTargets, effectiveCogsRate, mgmtCore, mgmt, consistency, mgmtLeverage, requiredRevenue };
 })();
