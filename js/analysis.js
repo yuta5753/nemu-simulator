@@ -116,9 +116,8 @@ window.Sim = window.Sim || {};
   }
   const pctOf = v => (v == null ? null : v / 100);
   const pct1 = v => (v == null ? '—' : (Math.round(v * 1000) / 10) + '%');
-  function mgmtHealth(state) {
-    const m = Sim.calc.mgmt(state); if (!m.available) return { available: false };
-    const b = state.benchmarks || {}; const p = m.prev;
+  function healthOf(m, b) {
+    const p = m.prev;
     const hasBench = b.grossMarginPct != null || b.laborPct != null || b.rentPct != null || b.adsPct != null || b.repeatRate != null;
     const mode = hasBench ? 'benchmark' : (p ? 'prev' : 'none');
     const mk = (key, label, value, prev, bench) => ({ key, label, value, prev, bench,
@@ -132,7 +131,11 @@ window.Sim = window.Sim || {};
     const gross = mk('grossMarginPct', '粗利率', m.grossMarginPct, p && p.grossMarginPct, pctOf(b.grossMarginPct));
     const repeat = mk('repeatRate', 'リピート率', m.repeatRate, p && p.repeatRate, pctOf(b.repeatRate));
     const lowContribution = m.products.filter(x => x.share != null && x.contributionShare != null && x.contributionShare < x.share * 0.9).map(x => x.name);
-    return { available: true, m, mode, ratios, gross, repeat, lowContribution };
+    return { mode, ratios, gross, repeat, lowContribution };
+  }
+  function mgmtHealth(state) {
+    const m = Sim.calc.mgmt(state); if (!m.available) return { available: false };
+    return Object.assign({ available: true, m }, healthOf(m, state.benchmarks || {}));
   }
   function consistencyCheck(state) {
     const c = Sim.calc.consistency(state); const flags = [];
@@ -173,5 +176,30 @@ window.Sim = window.Sim || {};
     if (!out.length) out.push('費用の構造や顧客の構成を入れると、ここにコメントが出ます。');
     return out;
   }
-  Sim.analysis = { MIN_BASE, LEVER_LABELS, QUADRANT_LABELS, portfolio, leverage, weakness, timing, checks, comments, mgmtHealth, consistencyCheck, mgmtChecks, mgmtComments };
+  const COVERAGE_LABELS = { revenue: '総売上', buyers: '購入客数', newBuyers: '新規客数', newRevenue: '新規客売上', activeCustomers: 'アクティブ顧客数', dormant: '休眠客数', inventory: '期末在庫',
+    visits: '来店回数別', funnel: '集客', 'costs.cogs': '仕入原価', 'costs.labor': '人件費', 'costs.rent': '家賃', 'costs.ads': '広告宣伝費', 'costs.other': 'その他経費' };
+  function coverageNote(cm) {
+    const parts = Object.keys(cm.coverage).filter(k => { const c = cm.coverage[k]; return c.n > 0 && c.n < c.total; }).map(k => `${COVERAGE_LABELS[k] || k} ${cm.coverage[k].n}／${cm.coverage[k].total}店舗`);
+    return parts.length ? `空欄の店舗は合算に含めていません（${parts.join('、')}）` : null;
+  }
+  function companyHealth(company) {
+    const cm = Sim.calc.companyMgmt(company); if (!cm.available) return { available: false, cm };
+    const b = (company.stores[0] && company.stores[0].benchmarks) || {};
+    return Object.assign({ available: true, m: cm.m, cm, coverageNote: coverageNote(cm) }, healthOf(cm.m, b));
+  }
+  function companyComments(company, period) {
+    const h = companyHealth(company); if (!h.available) return ['店舗タブで経営数値を入れると、全社の合算とコメントが出ます。'];
+    const cmp = Sim.calc.storeComparison(company, period || 3); const out = []; const nameOf = id => (cmp.stores.find(s => s.id === id) || {}).name || '';
+    const spread = key => { const mt = cmp.metrics.find(x => x.key === key); const vals = mt.values.filter(v => v.value != null); if (vals.length < 2) return null;
+      const hi = vals.reduce((a, b) => (b.value > a.value ? b : a)); const lo = vals.reduce((a, b) => (b.value < a.value ? b : a)); return { hi, lo }; };
+    const g = spread('grossMarginPct');
+    if (g) out.push(g.hi.value === g.lo.value ? `粗利率は全店とも${pct1(g.hi.value)}です。` : `粗利率が最も高いのは${nameOf(g.hi.storeId)}（${pct1(g.hi.value)}）、最も低いのは${nameOf(g.lo.storeId)}（${pct1(g.lo.value)}）。差は${(Math.round((g.hi.value - g.lo.value) * 1000) / 10)}ptです。`);
+    if (h.cm.breakEvenWithHq != null) out.push(`全社の損益分岐点売上は${yen(h.cm.breakEvenWithHq)}（本部費込み）で、安全余裕率は${pct1(h.cm.safetyMarginWithHq)}です。`);
+    const l = spread('laborPct'); if (l) out.push(`人件費率が最も高いのは${nameOf(l.hi.storeId)}（${pct1(l.hi.value)}）です。店舗別の営業利益には本部費を含めていません。`);
+    if (h.cm.hq.total == null) out.push('本部費が未入力のため、全社の営業利益は店舗合算の値をそのまま表示しています。');
+    else if (h.m.operatingProfit > 0) out.push(`本部費${yen(h.cm.hq.total)}は、店舗合算の営業利益${yen(h.m.operatingProfit)}の${pct1(h.cm.hq.total / h.m.operatingProfit)}にあたります。`);
+    if (h.coverageNote) out.push(h.coverageNote + '。');
+    return out.slice(0, 5);
+  }
+  Sim.analysis = { MIN_BASE, LEVER_LABELS, QUADRANT_LABELS, COVERAGE_LABELS, portfolio, leverage, weakness, timing, checks, comments, mgmtHealth, consistencyCheck, mgmtChecks, mgmtComments, companyHealth, companyComments };
 })();

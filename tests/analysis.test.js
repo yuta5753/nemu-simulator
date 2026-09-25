@@ -95,3 +95,20 @@ test('mgmtComments: 総売上のみでは何も言えることがなく、空コ
   const s = Sim.state.createEmptyStore(); s.mgmt.revenue = 10000000;
   eq(A.mgmtComments(s), ['費用の構造や顧客の構成を入れると、ここにコメントが出ます。']);
 });
+test('companyHealth: 合算の健康度と比較モード', () => {
+  const c = Sim.state.createSample(); const h = A.companyHealth(c); ok(h.available); eq(h.mode, 'none'); approx(h.gross.value, 0.5, 1e-9); eq(h.coverageNote, null); eq(h.cm.hq.total, 4800000);
+  eq(h.ratios.map(r => r.key), ['laborPct', 'rentPct', 'adsPct', 'otherPct']); approx(h.ratios[0].value, 15600000 / 76800000, 1e-9);
+  c.stores[0].benchmarks.laborPct = 18; Sim.state.syncShared(c, 0); const h2 = A.companyHealth(c); eq(h2.mode, 'benchmark'); approx(h2.ratios[0].diffBench, 15600000 / 76800000 - 0.18, 1e-9);
+  eq(A.companyHealth(Sim.state.createEmpty()).available, false);
+});
+test('companyHealth: カバレッジ注記', () => {
+  const c = Sim.state.createSample(); c.stores[1].mgmt.costs.labor = null; eq(A.companyHealth(c).coverageNote, '空欄の店舗は合算に含めていません（人件費 1／2店舗）');
+  c.stores[1].mgmt.visits.once = null; eq(A.companyHealth(c).coverageNote, '空欄の店舗は合算に含めていません（来店回数別 1／2店舗、人件費 1／2店舗）');
+});
+test('companyComments: 最大5件・本部費の文・未入力の文・空の案内', () => {
+  const c = Sim.state.createSample(); const out = A.companyComments(c, 3); ok(out.length <= 5); ok(out.some(t => t.includes('粗利率'))); ok(out.some(t => t.includes('人件費率が最も高いのは2号店')));
+  ok(out.some(t => t.includes('本部費480万円')), out.join('|')); ok(out.some(t => t.includes('損益分岐点売上は7,240万円')), out.join('|'));
+  c.company.hq = { labor: null, rent: null, ads: null, other: null }; const o2 = A.companyComments(c, 3); ok(o2.some(t => t.includes('本部費が未入力'))); ok(!o2.some(t => t.includes('にあたります')));
+  c.stores[1].mgmt.costs.labor = null; ok(A.companyComments(c, 3).some(t => t.includes('空欄の店舗は合算に含めていません')));
+  eq(A.companyComments(Sim.state.createEmpty(), 3), ['店舗タブで経営数値を入れると、全社の合算とコメントが出ます。']);
+});
