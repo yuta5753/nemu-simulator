@@ -37,7 +37,7 @@ test('parse: カンマ区切りで引用符の対応が崩れている行は警�
   eq(r.rows, []); eq(r.warnings.length, 1); ok(r.warnings[0].includes('引用符'));
 });
 test('apply: 名前一致は上書き、無ければ追加、シナリオのレバーも同期', () => {
-  const s = Sim.state.createSample();
+  const s = Sim.state.createSampleStore();
   const rows = [{name:'枕（フィッティング）', period:3, newCustomers:50, entryPrice:13000, sameDayRate:10, sameDayAov:3000, laterRate:70, laterAov:null, measuredLtv:null},
                 {name:'掛け布団', period:1, newCustomers:12, entryPrice:30000, sameDayRate:null, sameDayAov:null, laterRate:20, laterAov:8000, measuredLtv:null}];
   const r = P.apply(s, rows);
@@ -70,7 +70,7 @@ test('parseKeyValues: 同一項目が重複するとき、万フラグは後の�
   eq(P.parseKeyValues('総売上\t9000000\n総売上\t480万').values, { revenue: 4800000 });
 });
 test('applyKeyValues: 値を反映し、前期があれば prev を作る', () => {
-  const s = Sim.state.createEmpty(); const r = P.applyKeyValues(s, P.parseKeyValues('総売上\t100\n仕入原価\t40\n前期 総売上\t90'));
+  const s = Sim.state.createEmptyStore(); const r = P.applyKeyValues(s, P.parseKeyValues('総売上\t100\n仕入原価\t40\n前期 総売上\t90'));
   eq(s.mgmt.revenue, null, '元は変えない'); eq(r.state.mgmt.revenue, 1000000); eq(r.state.mgmt.costs.cogs, 400000); eq(r.state.mgmt.prev.revenue, 900000); eq(r.count, 2); eq(r.prevCount, 1);
   const r2 = P.applyKeyValues(s, P.parseKeyValues('総売上\t100')); eq(r2.state.mgmt.prev, null);
 });

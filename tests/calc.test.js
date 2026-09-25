@@ -1,5 +1,5 @@
 const C = Sim.calc;
-const sample = () => Sim.state.createSample();
+const sample = () => Sim.state.createSampleStore();
 test('ltv: 枕3年 = 12000 + 0.68×34000 = 35120', () => {
   const s = sample(); const v = C.ltv(s.categories[0], 3);
   eq(v.entry, 12000); approx(v.laterPart, 23120, 0.01); eq(v.sameDayPart, 0); approx(v.ltv, 35120, 0.01);
@@ -87,9 +87,9 @@ test('mgmt: サンプルの派生値', () => {
   eq(m.funnel.visitRate, 0.8); eq(m.funnel.dealRate, 0.75); eq(m.replacement[0].expectedBuyers, 40); eq(m.prev, null); eq(m.channels.length, 3);
 });
 test('mgmt: 部分入力は計算できるものだけ・未入力は null', () => {
-  const s = Sim.state.createEmpty(); s.mgmt.revenue = 10000000; const m = C.mgmt(s);
+  const s = Sim.state.createEmptyStore(); s.mgmt.revenue = 10000000; const m = C.mgmt(s);
   ok(m.available); eq(m.aov, null); eq(m.grossProfit, null); eq(m.breakEven, null); eq(m.repeatRate, null); eq(m.products, []); eq(m.inventoryTurnMonths, null);
-  eq(C.mgmt(Sim.state.createEmpty()).available, false);
+  eq(C.mgmt(Sim.state.createEmptyStore()).available, false);
 });
 test('mgmt: 粗利率が0以下なら損益分岐点・必要売上は null', () => {
   const s = sample(); s.mgmt.costs.cogs = 50000000; s.plan.requiredProfit = 1000000; const m = C.mgmt(s);
@@ -118,7 +118,7 @@ test('consistency: ②の新規合計と初回来店売上を①と比べる', (
 test('mgmtLeverage: 営業利益への4本のインパクト', () => {
   const lv = C.mgmtLeverage(sample()); eq(lv.base, 4800000);
   const d = Object.fromEntries(lv.items.map(i => [i.key, i.delta])); eq(d.revenue, 2400000); eq(d.gm, 480000); eq(d.labor, 480000); eq(d.ads, 180000); eq(lv.top.key, 'revenue');
-  eq(C.mgmtLeverage(Sim.state.createEmpty()), null);
+  eq(C.mgmtLeverage(Sim.state.createEmptyStore()), null);
 });
 test('requiredRevenue: 必要利益→必要売上→間口の目標', () => {
   const s = sample(); s.plan.requiredProfit = 6000000; const r = C.requiredRevenue(s);
