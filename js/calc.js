@@ -185,15 +185,16 @@ window.Sim = window.Sim || {};
   }
   function wavg(rows, valKey, wKey) { let s = 0, w = 0; rows.forEach(r => { if (r[valKey] != null && r[wKey] > 0) { s += r[valKey] * r[wKey]; w += r[wKey]; } }); return w > 0 ? s / w : null; }
   function mergeMgmt(list) {
-    const total = list.length; const m = Sim.state.emptyMgmt(); const coverage = {}; const cov = (k, n) => { coverage[k] = { n, total }; };
-    ['revenue', 'buyers', 'newBuyers', 'newRevenue', 'activeCustomers', 'dormant', 'inventory'].forEach(k => { const r = sumOf(list, x => x[k]); m[k] = r.s; cov(k, r.n); });
-    m.itemsPerBuyer = wavg(list, 'itemsPerBuyer', 'buyers');
-    const V = ['once', 'twice', 'threePlus']; V.forEach(k => { m.visits[k] = sumOf(list, x => x.visits && x.visits[k]).s; }); cov('visits', list.filter(x => x.visits && V.every(k => x.visits[k] != null)).length);
-    const F = ['reservations', 'visits', 'deals']; F.forEach(k => { m.funnel[k] = sumOf(list, x => x.funnel && x.funnel[k]).s; }); cov('funnel', list.filter(x => x.funnel && F.every(k => x.funnel[k] != null)).length);
-    ['cogs', 'labor', 'rent', 'ads', 'other'].forEach(k => { const r = sumOf(list, x => x.costs && x.costs[k]); m.costs[k] = r.s; cov('costs.' + k, r.n); });
-    m.products = mergeByName(list.map(x => x.products), (name, rows, i) => Sim.state.newProductRow({ id: 'agg_p' + i, name, sales: sumOf(rows, r => r.sales).s, grossMarginPct: wavg(rows, 'grossMarginPct', 'sales') }));
-    m.replacement = mergeByName(list.map(x => x.replacement), (name, rows, i) => Sim.state.newReplacementRow({ id: 'agg_r' + i, name, cycleYears: wavg(rows, 'cycleYears', 'pastBuyers'), pastBuyers: sumOf(rows, r => r.pastBuyers).s }));
-    const prevs = list.map(x => x.prev).filter(Boolean); m.prev = prevs.length ? mergeMgmt(prevs).mgmt : null;
+    const total = list.length; const anchored = list.filter(x => typeof x.revenue === 'number' && !isNaN(x.revenue));
+    const m = Sim.state.emptyMgmt(); const coverage = {}; const cov = (k, n) => { coverage[k] = { n, total }; };
+    ['revenue', 'buyers', 'newBuyers', 'newRevenue', 'activeCustomers', 'dormant', 'inventory'].forEach(k => { const r = sumOf(anchored, x => nn(x[k])); m[k] = r.s; cov(k, r.n); });
+    m.itemsPerBuyer = wavg(anchored, 'itemsPerBuyer', 'buyers');
+    const V = ['once', 'twice', 'threePlus']; V.forEach(k => { m.visits[k] = sumOf(anchored, x => nn(x.visits && x.visits[k])).s; }); cov('visits', anchored.filter(x => x.visits && V.every(k => x.visits[k] != null)).length);
+    const F = ['reservations', 'visits', 'deals']; F.forEach(k => { m.funnel[k] = sumOf(anchored, x => nn(x.funnel && x.funnel[k])).s; }); cov('funnel', anchored.filter(x => x.funnel && F.every(k => x.funnel[k] != null)).length);
+    ['cogs', 'labor', 'rent', 'ads', 'other'].forEach(k => { const r = sumOf(anchored, x => nn(x.costs && x.costs[k])); m.costs[k] = r.s; cov('costs.' + k, r.n); });
+    m.products = mergeByName(anchored.map(x => x.products), (name, rows, i) => Sim.state.newProductRow({ id: 'agg_p' + i, name, sales: sumOf(rows, r => nn(r.sales)).s, grossMarginPct: wavg(rows, 'grossMarginPct', 'sales') }));
+    m.replacement = mergeByName(anchored.map(x => x.replacement), (name, rows, i) => Sim.state.newReplacementRow({ id: 'agg_r' + i, name, cycleYears: wavg(rows, 'cycleYears', 'pastBuyers'), pastBuyers: sumOf(rows, r => nn(r.pastBuyers)).s }));
+    const prevs = anchored.map(x => x.prev).filter(Boolean); m.prev = prevs.length ? mergeMgmt(prevs).mgmt : null;
     return { mgmt: m, coverage };
   }
   function companyMgmt(company) {
@@ -202,7 +203,7 @@ window.Sim = window.Sim || {};
     const sts = stores.map(s => store(s, 1)); const newTotal = sts.reduce((a, x) => a + x.newTotal, 0); const cohort = sts.reduce((a, x) => a + x.revenue, 0);
     const weightedLtv = newTotal > 0 ? cohort / newTotal : 0; const cogsRate = m.grossMarginPct != null ? 1 - m.grossMarginPct : null;
     m.channels = mergeByName(stores.map(s => s.channels), (name, rows, i) => {
-      const n = sumOf(rows, r => r.newCustomers).s || 0, cost = sumOf(rows, r => r.cost).s || 0; const cpa = n > 0 ? cost / n : null;
+      const n = sumOf(rows, r => nn(r.newCustomers)).s || 0, cost = sumOf(rows, r => nn(r.cost)).s || 0; const cpa = n > 0 ? cost / n : null;
       return { id: 'agg_ch' + i, name, newCustomers: n, cost, cpa, payback: (cpa != null && cpa > 0 && cogsRate != null) ? weightedLtv * (1 - cogsRate) / cpa : null };
     });
     const hqRaw = (company && company.company && company.company.hq) || {}; const hqKeys = ['labor', 'rent', 'ads', 'other']; const hq = {};
