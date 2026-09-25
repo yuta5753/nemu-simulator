@@ -185,16 +185,17 @@ window.Sim = window.Sim || {};
   }
   function wavg(rows, valKey, wKey) { let s = 0, w = 0; rows.forEach(r => { if (r[valKey] != null && r[wKey] > 0) { s += r[valKey] * r[wKey]; w += r[wKey]; } }); return w > 0 ? s / w : null; }
   function mergeMgmt(list) {
-    const total = list.length; const anchored = list.filter(x => typeof x.revenue === 'number' && !isNaN(x.revenue));
+    const total = list.length; const anchored = list.filter(x => typeof x.revenue === 'number' && !isNaN(x.revenue)); const A = anchored.length;
     const m = Sim.state.emptyMgmt(); const coverage = {}; const cov = (k, n) => { coverage[k] = { n, total }; };
-    ['revenue', 'buyers', 'newBuyers', 'newRevenue', 'activeCustomers', 'dormant', 'inventory'].forEach(k => { const r = sumOf(anchored, x => nn(x[k])); m[k] = r.s; cov(k, r.n); });
+    const sumIfComplete = (get) => { const r = sumOf(anchored, get); return { s: r.n === A ? r.s : null, n: r.n }; };
+    ['revenue', 'buyers', 'newBuyers', 'newRevenue', 'activeCustomers', 'dormant', 'inventory'].forEach(k => { const r = sumIfComplete(x => nn(x[k])); m[k] = r.s; cov(k, r.n); });
     m.itemsPerBuyer = wavg(anchored, 'itemsPerBuyer', 'buyers');
-    const V = ['once', 'twice', 'threePlus']; V.forEach(k => { m.visits[k] = sumOf(anchored, x => nn(x.visits && x.visits[k])).s; }); cov('visits', anchored.filter(x => x.visits && V.every(k => x.visits[k] != null)).length);
-    const F = ['reservations', 'visits', 'deals']; F.forEach(k => { m.funnel[k] = sumOf(anchored, x => nn(x.funnel && x.funnel[k])).s; }); cov('funnel', anchored.filter(x => x.funnel && F.every(k => x.funnel[k] != null)).length);
-    ['cogs', 'labor', 'rent', 'ads', 'other'].forEach(k => { const r = sumOf(anchored, x => nn(x.costs && x.costs[k])); m.costs[k] = r.s; cov('costs.' + k, r.n); });
+    const V = ['once', 'twice', 'threePlus']; V.forEach(k => { const r = sumIfComplete(x => nn(x.visits && x.visits[k])); m.visits[k] = r.s; }); cov('visits', anchored.filter(x => x.visits && V.every(k => x.visits[k] != null)).length);
+    const F = ['reservations', 'visits', 'deals']; F.forEach(k => { const r = sumIfComplete(x => nn(x.funnel && x.funnel[k])); m.funnel[k] = r.s; }); cov('funnel', anchored.filter(x => x.funnel && F.every(k => x.funnel[k] != null)).length);
+    ['cogs', 'labor', 'rent', 'ads', 'other'].forEach(k => { const r = sumIfComplete(x => nn(x.costs && x.costs[k])); m.costs[k] = r.s; cov('costs.' + k, r.n); });
     m.products = mergeByName(anchored.map(x => x.products), (name, rows, i) => Sim.state.newProductRow({ id: 'agg_p' + i, name, sales: sumOf(rows, r => nn(r.sales)).s, grossMarginPct: wavg(rows, 'grossMarginPct', 'sales') }));
     m.replacement = mergeByName(anchored.map(x => x.replacement), (name, rows, i) => Sim.state.newReplacementRow({ id: 'agg_r' + i, name, cycleYears: wavg(rows, 'cycleYears', 'pastBuyers'), pastBuyers: sumOf(rows, r => nn(r.pastBuyers)).s }));
-    const prevs = anchored.map(x => x.prev).filter(Boolean); m.prev = prevs.length ? mergeMgmt(prevs).mgmt : null;
+    const prevs = anchored.map(x => x.prev); m.prev = (A > 0 && prevs.every(Boolean)) ? mergeMgmt(prevs).mgmt : null;
     return { mgmt: m, coverage };
   }
   function companyMgmt(company) {

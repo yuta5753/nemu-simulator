@@ -141,23 +141,32 @@ test('companyMgmt: 名寄せ（商品・買替・経路）', () => {
   const mat = m.replacement.find(x => x.name === 'マットレス'); eq(mat.pastBuyers, 510); approx(mat.cycleYears, 8, 1e-9); approx(mat.expectedBuyers, 510 / 8, 1e-9);
   eq(m.channels.length, 3); const g = m.channels.find(x => x.name === 'Google広告'); eq(g.newCustomers, 64); eq(g.cost, 1500000); approx(g.cpa, 1500000 / 64, 1e-6); ok(g.payback > 0);
 });
-test('companyMgmt: 売上が空の店舗は合算全体から外れ、売上のある店舗の個別空欄は項目単位で除外（率は歪まない）', () => {
+test('companyMgmt: 売上が空の店舗は合算全体から外れる（売上アンカー）', () => {
   const c = Sim.state.createSample(); c.stores[1].mgmt.revenue = null;
   const r = C.companyMgmt(c); eq(r.m.revenue, 48000000); eq(r.m.cogs, 24000000); eq(r.m.costs.labor, 9600000); eq(r.m.buyers, 700);
   approx(r.m.grossMarginPct, 0.5, 1e-9); eq(r.coverage.revenue, { n: 1, total: 2 }); eq(r.coverage['costs.labor'], { n: 1, total: 2 }); eq(r.m.products.length, 4); eq(r.m.products[0].sales, 5000000);
-  const d = Sim.state.createSample(); d.stores[1].mgmt.costs.labor = null;
-  const r2 = C.companyMgmt(d); eq(r2.m.revenue, 76800000); eq(r2.m.costs.labor, 9600000); eq(r2.coverage['costs.labor'], { n: 1, total: 2 }); eq(r2.coverage.revenue, { n: 2, total: 2 }); approx(r2.m.grossMarginPct, 0.5, 1e-9);
+});
+test('companyMgmt: 売上のある店舗の間で揃っていない項目は合算せず null（率の分母と分子を同じ店舗集合に保つ）', () => {
+  const c = Sim.state.createSample(); c.stores[1].mgmt.costs.labor = null;
+  const r = C.companyMgmt(c); eq(r.m.revenue, 76800000); eq(r.m.costs.labor, null); eq(r.m.laborPct, null); eq(r.m.fixedCosts, null); eq(r.m.operatingProfit, null); eq(r.m.breakEven, null);
+  approx(r.m.grossMarginPct, 0.5, 1e-9); approx(r.m.rentPct, 6000000 / 76800000, 1e-9); eq(r.coverage['costs.labor'], { n: 1, total: 2 }); eq(r.coverage['costs.rent'], { n: 2, total: 2 });
+  eq(r.operatingProfitAfterHq, null); eq(r.breakEvenWithHq, null); eq(C.companyRequired(Object.assign(c, { company: Object.assign({}, c.company, { plan: { requiredProfit: 10000000, existingGrowthPct: 0 } }) })), null);
+  const d = Sim.state.createSample(); d.stores[1].mgmt.costs.cogs = null; const r2 = C.companyMgmt(d); eq(r2.m.cogs, null); eq(r2.m.grossMarginPct, null); eq(r2.m.grossProfit, null); eq(r2.m.revenue, 76800000);
+  const e = Sim.state.createSample(); e.stores[1].mgmt.buyers = null; const r3 = C.companyMgmt(e); eq(r3.m.buyers, null); eq(r3.m.aov, null); eq(r3.m.newBuyers, 160);
+  const f = Sim.state.createSample(); f.stores[1].mgmt.visits.once = null; const r4 = C.companyMgmt(f); eq(r4.m.visits.once, null); eq(r4.m.visits.twice, 400); eq(r4.m.repeatRate, null); eq(r4.coverage.visits, { n: 1, total: 2 });
 });
 test('companyMgmt: 全店空欄なら available=false、本部費 null なら本部費前の値', () => {
   const c = Sim.state.createEmpty(); Sim.state.addStore(c); const r = C.companyMgmt(c); eq(r.available, false); eq(r.hq.total, null); eq(r.operatingProfitAfterHq, null); eq(r.m.products, []);
   const d = Sim.state.createSample(); d.company.hq = { labor: null, rent: null, ads: null, other: null }; const r2 = C.companyMgmt(d);
   eq(r2.hq.total, null); eq(r2.operatingProfitAfterHq, 7000000); eq(r2.fixedCostsWithHq, 31400000); approx(r2.breakEvenWithHq, 62800000, 0.01);
 });
-test('companyMgmt: 本部費の負値は0扱い、前期は値のある店舗だけで合算', () => {
+test('companyMgmt: 負値は0扱い、前期は全店に揃うときだけ合算', () => {
   const c = Sim.state.createSample(); c.company.hq.labor = -100; eq(C.companyMgmt(c).hq.labor, 0); eq(C.companyMgmt(c).hq.total, 1800000);
   c.stores[1].mgmt.buyers = -5; eq(C.companyMgmt(c).m.buyers, 700);
   c.stores[0].mgmt.prev = Sim.state.normalizeMgmt({ revenue: 40000000, costs: { cogs: 21000000 } }, false);
-  const r = C.companyMgmt(c); eq(r.m.prev.revenue, 40000000); approx(r.m.prev.grossMarginPct, 19 / 40, 1e-9);
+  eq(C.companyMgmt(c).m.prev, null, '前期は全店に揃うときだけ合算');
+  c.stores[1].mgmt.prev = Sim.state.normalizeMgmt({ revenue: 20000000, costs: { cogs: 9000000 } }, false);
+  const r = C.companyMgmt(c); eq(r.m.prev.revenue, 60000000); approx(r.m.prev.grossMarginPct, 30 / 60, 1e-9);
 });
 test('companyRequired: 本部費込みの必要売上。条件不足なら null', () => {
   const c = Sim.state.createSample(); eq(C.companyRequired(c), null);
